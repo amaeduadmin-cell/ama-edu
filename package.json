@@ -1,0 +1,18 @@
+{
+  "name": "amaedu",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AMA EDU — multi-tenant school management platform",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

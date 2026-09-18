@@ -1,0 +1,4 @@
+# Cloudflare Pages SPA fallback. Every path (/dashboard, /students,
+# /register ...) is served by index.html and resolved client-side by
+# src/lib/router.js. Without this, a hard refresh on /dashboard 404s.
+/*  /index.html  200

@@ -1,0 +1,112 @@
+/* ===============================================================
+   AMA EDU — design tokens
+   ---------------------------------------------------------------
+   Two layers on purpose:
+
+   --ama-*    platform identity. Fixed. Used by the marketing site,
+              the registration flow and the platform admin console.
+   --brand-*  the ACTIVE SCHOOL's identity. Defaults to the platform
+              palette and is overwritten at runtime by
+              applyTenantBranding() once the tenant config loads.
+
+   Anything inside a school portal styles itself from --brand-*, so a
+   school changes its colours from Settings without a code change.
+   =============================================================== */
+
+:root {
+  /* Platform palette ------------------------------------------- */
+  --ama-ink:        #12211b;   /* deep green-black; body text */
+  --ama-ink-2:      #24352c;
+  --ama-slate:      #5c6b63;   /* secondary text */
+  --ama-slate-2:    #84968c;
+  --ama-paper:      #f7f8f5;   /* page background */
+  --ama-surface:    #ffffff;
+  --ama-surface-2:  #f1f4ef;
+  --ama-line:       #dde3dc;
+  --ama-line-2:     #eef1ec;
+
+  --ama-green:      #0f6b3f;   /* primary */
+  --ama-green-deep: #0a4e2e;
+  --ama-green-soft: #e6f1ea;
+  --ama-brass:      #b8862b;   /* accent — crest/seal/medal */
+  --ama-brass-soft: #f6efdd;
+
+  --ama-danger:      #b3261e;
+  --ama-danger-soft: #fbeae9;
+  --ama-warn:        #8a5a00;
+  --ama-warn-soft:   #fdf2dc;
+  --ama-info:        #0b5c8a;
+  --ama-info-soft:   #e4f0f7;
+
+  /* Active school branding (runtime-overridable) ---------------- */
+  --brand-primary:      var(--ama-green);
+  --brand-primary-deep: var(--ama-green-deep);
+  --brand-primary-soft: var(--ama-green-soft);
+  --brand-accent:       var(--ama-brass);
+  --brand-on-primary:   #ffffff;
+
+  /* Type -------------------------------------------------------- */
+  --font-ui: "Public Sans", ui-sans-serif, system-ui, -apple-system,
+             "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+
+  /* Scale is a modest 1.2 ratio — this is a dense admin product,
+     not a marketing microsite, so headings stay close to body size. */
+  --t-xs:   0.75rem;
+  --t-sm:   0.8125rem;
+  --t-base: 0.9375rem;
+  --t-md:   1.0625rem;
+  --t-lg:   1.25rem;
+  --t-xl:   1.5rem;
+  --t-2xl:  2rem;
+  --t-3xl:  2.75rem;
+  --t-4xl:  3.5rem;
+
+  /* Space — 4px base */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
+
+  /* Radius is deliberately varied by role, not one value on
+     everything: sheets are square-ish, controls are soft. */
+  --r-sheet: 6px;
+  --r-card:  10px;
+  --r-ctrl:  8px;
+  --r-pill:  999px;
+
+  --shadow-1: 0 1px 2px rgba(18, 33, 27, 0.06),
+              0 1px 3px rgba(18, 33, 27, 0.04);
+  --shadow-2: 0 4px 12px rgba(18, 33, 27, 0.07),
+              0 1px 3px rgba(18, 33, 27, 0.05);
+  --shadow-3: 0 18px 44px rgba(18, 33, 27, 0.14);
+
+  --sidebar-w: 248px;
+  --topbar-h: 60px;
+  --maxw: 1180px;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Dark mode is a school-portal comfort feature (long score-entry
+   sessions), so it keeps the same hues at lower luminance rather
+   than switching to a different palette. */
+[data-theme="dark"] {
+  --ama-ink:       #e8efe9;
+  --ama-ink-2:     #c7d5cb;
+  --ama-slate:     #93a79a;
+  --ama-paper:     #0d1712;
+  --ama-surface:   #141f19;
+  --ama-surface-2: #1b2821;
+  --ama-line:      #27352d;
+  --ama-line-2:    #1f2c25;
+
+  --ama-green-soft: #16301f;
+  --ama-brass-soft: #2e2510;
+  --ama-danger-soft:#2f1512;
+  --ama-warn-soft:  #2c2109;
+  --ama-info-soft:  #10262f;
+
+  --brand-primary-soft: #16301f;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 18px 44px rgba(0, 0, 0, 0.55);
+}

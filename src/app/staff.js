@@ -21,11 +21,12 @@ const ROLES = [
   ["registrar_primary", "Registrar (Nursery & Primary)"], ["registrar_secondary", "Registrar (JSS & SS)"],
 ];
 const ROLE_LABEL = Object.fromEntries(ROLES);
+const PAGE_SIZE = 25;
 
 export default async function render({ outlet }) {
   if (!requireRole(outlet, "admin")) return;
 
-  const state = { search: "", staff: [], loading: true };
+  const state = { search: "", staff: [], loading: true, page: 0, total: 0 };
   const body = h("div.u-stack");
   mount(outlet, page({
     title: "Staff",
@@ -39,12 +40,18 @@ export default async function render({ outlet }) {
   async function load() {
     state.loading = true; draw();
     try {
-      state.staff = unwrap(
-        await supabase.from("staff")
-          .select("id, staff_code, full_name, email, phone, position, is_active, user_id, school_members(role)")
-          .order("full_name"),
-        "fetch staff"
-      );
+      let q = supabase.from("staff")
+        .select("id, staff_code, full_name, email, phone, position, is_active, user_id, school_members(role)", { count: "exact" })
+        .order("full_name");
+      const term = state.search.trim();
+      if (term) q = q.or(`full_name.ilike.%${term}%,staff_code.ilike.%${term}%`);
+      const from = state.page * PAGE_SIZE;
+      q = q.range(from, from + PAGE_SIZE - 1);
+
+      const { data, error, count } = await q;
+      if (error) throw error;
+      state.staff = data;
+      state.total = count ?? data.length;
     } catch (err) {
       logError("load staff", err);
       state.error = humanError(err);
@@ -53,27 +60,56 @@ export default async function render({ outlet }) {
     }
   }
 
-  function filtered() {
-    const term = state.search.trim().toLowerCase();
-    if (!term) return state.staff;
-    return state.staff.filter((s) => s.full_name.toLowerCase().includes(term) || s.staff_code.toLowerCase().includes(term));
+  function goToPage(delta) {
+    const next = state.page + delta;
+    if (next < 0 || next * PAGE_SIZE >= state.total) return;
+    state.page = next;
+    load();
   }
 
+  let searchTimer;
+  function onSearchInput(value) {
+    state.search = value;
+    state.page = 0;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(load, 300);
+  }
+
+  let searchFocused = false;
+  let searchCaret = null;
+
   function draw() {
-    if (state.loading) return mount(body, h("div.card", {}, skeleton(6)));
+    if (state.loading) { mount(body, h("div.card", {}, skeleton(6))); return; }
     if (state.error) return mount(body, errorState(state.error, load));
 
-    const rows = filtered();
+    const rows = state.staff;
+    const from = state.total === 0 ? 0 : state.page * PAGE_SIZE + 1;
+    const to = Math.min(state.total, state.page * PAGE_SIZE + rows.length);
+
     mount(body,
       h("div.card.card-flush", {},
         h("div.u-row", { style: { padding: "16px", borderBottom: "1px solid var(--ama-line)" } },
-          h("input.input.u-grow", { type: "search", placeholder: "Search by name or staff ID", value: state.search,
-            oninput: (e) => { state.search = e.target.value; draw(); } })),
+          h("input.input.u-grow#staffSearch", { type: "search", placeholder: "Search by name or staff ID", value: state.search,
+            oninput: (e) => { searchCaret = e.target.selectionStart; onSearchInput(e.target.value); },
+            onfocus: () => { searchFocused = true; }, onblur: () => { searchFocused = false; } })),
         rows.length ? table(rows) : h("div", { style: { padding: "16px" } }, emptyState({
-          title: state.staff.length ? "No staff match" : "No staff yet",
-          body: state.staff.length ? "Try a different name or ID." : "Add your first staff member to get started.",
+          title: state.total ? "No staff match" : "No staff yet",
+          body: state.total ? "Try a different name or ID." : "Add your first staff member to get started.",
         })),
-      ));
+      ),
+      h("div.u-row", { style: { justifyContent: "space-between" } },
+        h("p.u-xs.u-muted", { text: state.total ? `${from}–${to} of ${state.total} staff` : "0 staff" }),
+        state.total > PAGE_SIZE ? h("div.u-row", { style: { gap: "6px" } },
+          h("button.btn.btn-outline.btn-sm", { type: "button", text: "Previous", disabled: state.page === 0, onclick: () => goToPage(-1) }),
+          h("button.btn.btn-outline.btn-sm", { type: "button", text: "Next", disabled: to >= state.total, onclick: () => goToPage(1) }),
+        ) : null,
+      ),
+    );
+
+    if (searchFocused) {
+      const input = document.getElementById("staffSearch");
+      if (input) { input.focus(); if (searchCaret != null) input.setSelectionRange(searchCaret, searchCaret); }
+    }
   }
 
   function table(rows) {

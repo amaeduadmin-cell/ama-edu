@@ -15,10 +15,12 @@ import { emptyState, errorState, field, inlineAlert, openModal, closeModal, conf
 import { fetchClasses, initials, fmtDate } from "../lib/data.js";
 import { hasRole, session } from "../lib/auth.js";
 
+const PAGE_SIZE = 25;
+
 export default async function render({ outlet }) {
   if (!requireRole(outlet, "admin", "registrar_primary", "registrar_secondary", "teacher", "headmaster", "principal")) return;
 
-  const state = { search: "", classId: "", students: [], classes: [], loading: true };
+  const state = { search: "", classId: "", students: [], classes: [], loading: true, page: 0, total: 0 };
   const canWrite = hasRole("admin", "registrar_primary", "registrar_secondary");
 
   const body = h("div.u-stack");
@@ -29,23 +31,35 @@ export default async function render({ outlet }) {
     body,
   }));
 
+  try {
+    state.classes = await fetchClasses();
+  } catch (err) {
+    logError("load classes", err);
+  }
   await load();
 
+  /** Search and class filter run server-side, not against an in-memory
+   *  array — a school with a thousand students should not download all
+   *  of them to filter three keystrokes' worth on the client. */
   async function load() {
     state.loading = true;
     draw();
     try {
-      const [classes, students] = await Promise.all([
-        fetchClasses(),
-        unwrap(
-          await supabase.from("students")
-            .select("id, admission_no, full_name, gender, photo_url, is_active, class_id, classes(name), user_id, guardian_phone")
-            .order("full_name"),
-          "fetch students"
-        ),
-      ]);
-      state.classes = classes;
-      state.students = students;
+      let q = supabase.from("students")
+        .select("id, admission_no, full_name, gender, photo_url, is_active, class_id, classes(name), user_id, guardian_phone", { count: "exact" })
+        .order("full_name");
+
+      if (state.classId) q = q.eq("class_id", state.classId);
+      const term = state.search.trim();
+      if (term) q = q.or(`full_name.ilike.%${term}%,admission_no.ilike.%${term}%`);
+
+      const from = state.page * PAGE_SIZE;
+      q = q.range(from, from + PAGE_SIZE - 1);
+
+      const { data, error, count } = await q;
+      if (error) throw error;
+      state.students = data;
+      state.total = count ?? data.length;
     } catch (err) {
       logError("load students", err);
       state.error = humanError(err);
@@ -55,31 +69,49 @@ export default async function render({ outlet }) {
     }
   }
 
-  function filtered() {
-    const term = state.search.trim().toLowerCase();
-    return state.students.filter((s) => {
-      if (state.classId && s.class_id !== state.classId) return false;
-      if (!term) return true;
-      return s.full_name.toLowerCase().includes(term) || s.admission_no.toLowerCase().includes(term);
-    });
+  function goToPage(delta) {
+    const next = state.page + delta;
+    if (next < 0 || next * PAGE_SIZE >= state.total) return;
+    state.page = next;
+    load();
   }
 
+  let searchTimer;
+  function onSearchInput(value) {
+    state.search = value;
+    state.page = 0;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(load, 300);
+  }
+
+  let searchFocused = false;
+  let searchCaret = null;
+
   function draw() {
-    if (state.loading) return mount(body, h("div.card", {}, skeleton(6)));
+    if (state.loading) {
+      mount(body, h("div.card", {}, skeleton(6)));
+      // No input exists during the loading flash to refocus — that's
+      // fine, the real draw() right after data arrives restores it.
+      return;
+    }
     if (state.error) return mount(body, errorState(state.error, load));
 
-    const rows = filtered();
+    const rows = state.students;
+    const from = state.total === 0 ? 0 : state.page * PAGE_SIZE + 1;
+    const to = Math.min(state.total, state.page * PAGE_SIZE + rows.length);
 
     mount(body,
       h("div.card.card-flush", {},
         h("div.u-row.u-wrap", { style: { padding: "16px", borderBottom: "1px solid var(--ama-line)" } },
-          h("input.input.u-grow", {
+          h("input.input.u-grow#studentSearch", {
             type: "search", placeholder: "Search by name or admission number", value: state.search,
-            oninput: (e) => { state.search = e.target.value; draw(); },
+            oninput: (e) => { searchCaret = e.target.selectionStart; onSearchInput(e.target.value); },
+            onfocus: () => { searchFocused = true; },
+            onblur: () => { searchFocused = false; },
             style: { minWidth: "200px" },
           }),
           h("select.select", {
-            value: state.classId, onchange: (e) => { state.classId = e.target.value; draw(); },
+            value: state.classId, onchange: (e) => { state.classId = e.target.value; state.page = 0; load(); },
             style: { maxWidth: "220px" },
           },
             h("option", { value: "", text: "All classes" }),
@@ -87,13 +119,24 @@ export default async function render({ outlet }) {
           ),
         ),
         rows.length ? table(rows) : h("div", { style: { padding: "16px" } }, emptyState({
-          title: state.students.length ? "No students match" : "No students yet",
-          body: state.students.length ? "Try a different name, admission number or class." : "Admit your first student to get started.",
-          action: (!state.students.length && canWrite) ? h("button.btn.btn-primary.btn-sm", { type: "button", text: "Admit student", onclick: () => openStudentForm() }) : null,
+          title: state.total ? "No students match" : "No students yet",
+          body: state.total ? "Try a different name, admission number or class." : "Admit your first student to get started.",
+          action: (!state.total && canWrite) ? h("button.btn.btn-primary.btn-sm", { type: "button", text: "Admit student", onclick: () => openStudentForm() }) : null,
         })),
       ),
-      h("p.u-xs.u-muted", { text: `${rows.length} of ${state.students.length} students` }),
+      h("div.u-row", { style: { justifyContent: "space-between" } },
+        h("p.u-xs.u-muted", { text: state.total ? `${from}–${to} of ${state.total} students` : "0 students" }),
+        state.total > PAGE_SIZE ? h("div.u-row", { style: { gap: "6px" } },
+          h("button.btn.btn-outline.btn-sm", { type: "button", text: "Previous", disabled: state.page === 0, onclick: () => goToPage(-1) }),
+          h("button.btn.btn-outline.btn-sm", { type: "button", text: "Next", disabled: to >= state.total, onclick: () => goToPage(1) }),
+        ) : null,
+      ),
     );
+
+    if (searchFocused) {
+      const input = document.getElementById("studentSearch");
+      if (input) { input.focus(); if (searchCaret != null) input.setSelectionRange(searchCaret, searchCaret); }
+    }
   }
 
   function table(rows) {

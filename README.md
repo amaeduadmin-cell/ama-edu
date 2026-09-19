@@ -181,16 +181,19 @@ find-my-school, platform and portal sign-in, password reset, 404,
 unauthorized, school-not-found and suspended-school screens.
 
 **School portal** — dashboard; students (search, admit, edit, deactivate,
-provision logins); staff (same, plus role assignment); curriculum (subjects,
-class offerings, teacher assignments); classes & score entry (grades and
-positions computed in Postgres, never the browser); results (class positions
-and per-subject rankings); report cards, master list and student detail (one
-shared renderer so the printed artefact is identical everywhere it appears);
-my report card (fee-gated for students); fees (admin sets amounts, bursar
-records payments, fail-closed on missing payment rows); timetable (real
-double-booking prevention, not app-level checking); certificates; analytics;
-bulk import; settings (branding re-applies live, academic term switching,
-admission scheme, password change for everyone); announcements.
+provision logins, server-side search and pagination for rosters that outgrow
+one page); staff (same, plus role assignment, also paginated); curriculum
+(subjects, class offerings, teacher assignments); classes & score entry
+(grades and positions computed in Postgres, never the browser); results
+(class positions and per-subject rankings); report cards, master list and
+student detail (one shared renderer so the printed artefact is identical
+everywhere it appears); my report card (fee-gated for students); fees
+(admin sets amounts, bursar records payments, fail-closed on missing payment
+rows); timetable (real double-booking prevention, not app-level checking);
+certificates; analytics; bulk import; settings (branding re-applies live,
+academic term switching, admission scheme, password change for everyone);
+announcements; transactional email (welcome and login-ready notifications,
+best-effort, never blocking the action that triggered them).
 
 **Platform console** — overview, schools list with search and status
 control, and per-school detail with administrators, subscription plan, and
@@ -199,8 +202,13 @@ the same status controls scoped to one school.
 ## Database
 
 Live in Supabase project `ybjwdkoxihxahzsgypug` (`amaeduDB1`), 30 tables, 15
-numbered migrations. Pull them into this repo with `supabase link` then
-`supabase db pull`.
+numbered migrations — now committed as actual `.sql` files in
+`supabase/migrations/`, not just applied live and left there. Every file was
+cross-checked against the live database after being written: all 20
+`app.*` functions and all 65 policy names were enumerated from Postgres and
+matched one-for-one against what's in these files. Pull further changes with
+`supabase link --project-ref ybjwdkoxihxahzsgypug && supabase db pull`; push
+a new local migration with `supabase db push`.
 
 **30 tables**, every school-scoped one carrying `school_id`:
 
@@ -241,10 +249,21 @@ No roster, no result, no count. Every table is unreachable to `anon`.
 
 ### Edge Functions
 
+Source lives in `supabase/functions/`. Both share `_shared/email.ts`, a
+thin, provider-agnostic `sendEmail({ to, subject, html, text })` — every
+call site knows nothing about Resend specifically, so swapping providers
+later means editing one file. With no `RESEND_API_KEY` configured it logs
+and returns instead of throwing: email is best-effort on top of a working
+registration or login, never a blocker for either. Set `RESEND_API_KEY` and
+`MAIL_FROM` under Edge Functions → Secrets to turn it on.
+
 | Function | JWT | Job |
 |---|---|---|
-| `register-school` | off (public signup) | Validates input, re-checks slug availability, creates the admin account, the school, its defaults and the membership row — unwinding all of it if any step fails |
-| `provision-user` | on | Gives a staff member or student a shadow login. Reads the school from the target row and compares it to the caller's own tenant |
+| `register-school` | off (public signup) | Validates input, re-checks slug availability, creates the admin account, the school, its defaults and the membership row — unwinding all of it if any step fails. Sends a best-effort welcome email with the portal link. |
+| `provision-user` | on | Gives a staff member or student a shadow login. Reads the school from the target row and compares it to the caller's own tenant. Sends a best-effort "your login is ready" email — to the staff member directly, or to a student's guardian, since students have no email of their own — naming the sign-in ID but never the password. |
+
+Deploy after editing locally: `supabase functions deploy register-school`
+and `supabase functions deploy provision-user`.
 
 ### How this was tested
 

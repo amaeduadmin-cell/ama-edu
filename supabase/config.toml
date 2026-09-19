@@ -1,0 +1,22 @@
+# AMA EDU — Supabase CLI config.
+# Pull the live schema into this repo:
+#   supabase link --project-ref ybjwdkoxihxahzsgypug
+#   supabase db pull
+# Push a new migration you've added locally:
+#   supabase db push
+# Deploy an Edge Function after editing it here:
+#   supabase functions deploy register-school
+#   supabase functions deploy provision-user
+#
+# register-school has verify_jwt = false because it's the public
+# signup endpoint — nobody has an account yet when it's called.
+# provision-user requires a valid JWT; it reads the caller's own
+# tenant from that token, never from the request body.
+
+project_id = "ybjwdkoxihxahzsgypug"
+
+[functions.register-school]
+verify_jwt = false
+
+[functions.provision-user]
+verify_jwt = true

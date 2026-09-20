@@ -1,0 +1,43 @@
+# AMA EDU — crawl the public marketing site and school profiles,
+# never the authenticated portal.
+#
+# These paths are also marked noindex at runtime by src/lib/seo.js.
+# robots.txt asks a crawler not to FETCH them; the meta tag tells one
+# that fetches anyway not to INDEX them. Both are needed.
+
+User-agent: *
+Allow: /$
+Allow: /register
+Allow: /find-school
+Allow: /schools/
+Allow: /blog
+
+Disallow: /dashboard
+Disallow: /students
+Disallow: /staff
+Disallow: /classes
+Disallow: /curriculum
+Disallow: /timetable
+Disallow: /report-cards
+Disallow: /results
+Disallow: /publication
+Disallow: /attendance
+Disallow: /assessments
+Disallow: /assignments
+Disallow: /my-report
+Disallow: /my-exams
+Disallow: /my-children
+Disallow: /overview
+Disallow: /master-list
+Disallow: /certificates
+Disallow: /analytics
+Disallow: /fees
+Disallow: /announcements
+Disallow: /import
+Disallow: /settings
+Disallow: /academic-settings
+Disallow: /admin
+Disallow: /login
+Disallow: /reset-password
+
+Sitemap: https://amaedu.com.ng/sitemap.xml

@@ -1,0 +1,163 @@
+/* ===============================================================
+   Report card — screen and A4 print.
+
+   Printing uses the browser's own dialog against these rules rather
+   than a PDF library, so a school on a slow connection is not asked
+   to download one. The sheet is sized in millimetres so what comes
+   out of the printer matches what is on screen.
+   =============================================================== */
+
+.report-card {
+  background: var(--ama-surface);
+  color: var(--ama-ink);
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 24px 26px;
+  border: 1px solid var(--ama-line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--shadow-1);
+  font-size: 13px;
+}
+
+/* ---------- header ---------- */
+/* Template 1 keeps every assessment column, so it runs a little
+   tighter than Template 2. */
+.rc-classic .rc-table th, .rc-classic .rc-table td { padding: 5px 6px; }
+
+.rc-head { border-bottom: 3px solid var(--brand-primary, var(--ama-green)); padding-bottom: 12px; }
+.rc-accent-secondary { border-bottom-color: var(--brand-accent, var(--ama-brass)); }
+
+.rc-head-main { display: flex; align-items: center; gap: 14px; }
+.rc-crest { width: 56px; height: 56px; object-fit: contain; border-radius: 6px; flex: none; }
+.rc-crest-fallback {
+  display: grid; place-items: center;
+  background: var(--ama-green-soft); color: var(--ama-green-deep);
+  font-weight: 700; font-size: 24px;
+}
+.rc-school { flex: 1 1 auto; min-width: 0; }
+.rc-school-name {
+  font-family: var(--font-display); font-size: 20px; font-weight: 700;
+  color: var(--ama-green-deep); line-height: 1.2;
+}
+.rc-motto { font-style: italic; color: var(--ama-slate); font-size: 12px; }
+.rc-contact { font-size: 11px; color: var(--ama-slate); margin-top: 2px; }
+.rc-photo {
+  width: 64px; height: 76px; object-fit: cover; flex: none;
+  border: 1px solid var(--ama-line); border-radius: 4px;
+}
+.rc-title {
+  text-align: center; margin: 12px 0 0; font-size: 14px;
+  letter-spacing: 0.10em; text-transform: uppercase; color: var(--ama-green-deep);
+}
+
+/* ---------- meta ---------- */
+.rc-meta {
+  display: flex; flex-wrap: wrap; gap: 8px 24px;
+  margin: 12px 0; padding: 10px 12px;
+  background: var(--ama-surface-2); border-radius: var(--r-ctrl);
+}
+.rc-meta-item { min-width: 130px; }
+.rc-meta-label { color: var(--ama-slate); font-size: 11px; display: block; }
+.rc-meta-value { font-weight: 600; font-size: 13px; }
+
+/* ---------- table ---------- */
+.rc-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+.rc-table th, .rc-table td {
+  border: 1px solid var(--ama-line); padding: 6px 8px; text-align: left; vertical-align: middle;
+}
+.rc-table thead th {
+  background: var(--ama-green-deep); color: #fff;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600;
+}
+.rc-compact .rc-table thead th { background: var(--ama-green); }
+.rc-table .n, .rc-table th.n { text-align: center; white-space: nowrap; }
+.rc-table tbody tr:nth-child(even) { background: var(--ama-mist); }
+.rc-total { font-weight: 700; }
+.rc-grade { font-weight: 700; color: var(--ama-emerald-deep); }
+.rc-remark-cell { font-size: 11px; color: var(--ama-slate); }
+.rc-empty { text-align: center; color: var(--ama-slate); padding: 18px; }
+
+/* ---------- summary ---------- */
+.rc-summary {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px; margin-top: 14px;
+}
+.rc-stat {
+  background: var(--ama-surface-2); border: 1px solid var(--ama-line-2);
+  border-radius: var(--r-ctrl); padding: 8px 10px;
+}
+.rc-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ama-slate); }
+.rc-stat-value { font-weight: 700; font-size: 15px; color: var(--ama-ink); }
+
+/* Template 2 puts remarks beside the summary rather than beneath it. */
+.rc-compact-lower { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; margin-top: 14px; align-items: start; }
+.rc-remark-panel {
+  border: 1px solid var(--ama-line); border-radius: var(--r-ctrl); padding: 10px 12px;
+  background: var(--ama-brass-soft);
+}
+.rc-remark-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ama-slate); margin-bottom: 4px; }
+.rc-muted { color: var(--ama-slate); font-size: 12px; margin: 0; }
+.rc-remarks p { margin: 4px 0; font-size: 12px; }
+
+/* ---------- grade key ---------- */
+.rc-key { margin-top: 12px; font-size: 10.5px; color: var(--ama-slate); }
+.rc-key-label { font-weight: 600; }
+.rc-key-item:not(:last-child)::after { content: " · "; }
+
+/* ---------- signatures ---------- */
+.rc-signatures { display: flex; gap: 22px; align-items: flex-end; margin-top: 22px; flex-wrap: wrap; }
+.rc-sign { flex: 1 1 160px; min-width: 140px; }
+.rc-sign-line { border-bottom: 1px solid var(--ama-ink-2); height: 26px; }
+.rc-sign-label { font-size: 10px; color: var(--ama-slate); margin-top: 3px; }
+.rc-sign-name { font-size: 11px; font-weight: 600; }
+.rc-seal {
+  width: 76px; height: 76px; flex: none; border-radius: 50%;
+  border: 2px dashed var(--ama-line); display: grid; place-items: center;
+  font-size: 8px; letter-spacing: 0.06em; color: var(--ama-slate); text-align: center;
+}
+.rc-footer-note { font-size: 10px; color: var(--ama-slate); margin-top: 10px; text-align: center; }
+
+/* ---------- mobile ---------- */
+@media (max-width: 640px) {
+  .report-card { padding: 16px 14px; }
+  .rc-compact-lower { grid-template-columns: 1fr; }
+  .rc-head-main { flex-wrap: wrap; }
+  .rc-photo { width: 52px; height: 62px; }
+  /* Wide score tables scroll inside themselves rather than pushing
+     the whole page sideways. */
+  .rc-table { display: block; overflow-x: auto; white-space: nowrap; }
+}
+
+/* ---------- print ---------- */
+@page { size: A4 portrait; margin: 10mm; }
+
+@media print {
+  /* Nothing from the dashboard shell reaches the paper. */
+  .no-print, .sidebar, .topbar, .sidebar-scrim, .page-actions, .app-footer { display: none !important; }
+
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  .shell, .shell-body, .main { display: block !important; margin: 0 !important; padding: 0 !important; }
+
+  .report-card {
+    width: 190mm; max-width: 190mm; margin: 0 auto;
+    border: none; border-radius: 0; box-shadow: none;
+    padding: 0; font-size: 11pt;
+    break-inside: avoid;
+  }
+
+  /* One report per sheet when several are printed together. */
+  .report-card + .report-card { break-before: page; }
+
+  .rc-table { font-size: 9.5pt; }
+  .rc-table thead { display: table-header-group; }   /* repeat header across pages */
+  .rc-table tr, .rc-stat, .rc-signatures { break-inside: avoid; }
+
+  /* Printers drop background colours by default; force the ones that
+     carry meaning so the header row is not white-on-white. */
+  .rc-table thead th, .rc-crest-fallback, .rc-stat, .rc-remark-panel, .rc-meta {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  a[href]::after { content: ""; }   /* no URL footnotes on a report card */
+}

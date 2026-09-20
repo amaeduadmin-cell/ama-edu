@@ -30,15 +30,30 @@ export class AppError extends Error {
   }
 }
 
+/* The database functions in migrations 0018-0030 raise sentences written
+   for people ("CA1 cannot be lowered to 10: 2 student(s) already have a
+   higher mark."). Showing the generic text for their error codes would
+   throw that away. So: for the codes those functions use, show the
+   message itself — unless it looks like raw Postgres output (constraint
+   names, table names, RLS wording), which stays hidden. */
+const AUTHORED_CODES = new Set(["23514", "22023", "P0001", "42501", "23503"]);
+const RAW_DB = /violates|row-level security|relation "|constraint|column "|duplicate key|null value|syntax error|permission denied|does not exist|invalid input|out of range|schema/i;
+
 /** Turn anything thrown into a sentence safe to show a user. */
 export function humanError(err, fallback = "Something went wrong. Try again in a moment.") {
   if (!err) return fallback;
   if (err instanceof AppError) return err.message;
 
   const code = err.code || err.error_code || err.status;
+
+  const raw = String(err.message || "");
+  if (code && AUTHORED_CODES.has(String(code)) && raw && raw.length < 240 && !RAW_DB.test(raw)) {
+    return raw;
+  }
+
   if (code && BY_CODE[code]) return BY_CODE[code];
 
-  const message = String(err.message || "");
+  const message = raw;
   if (/failed to fetch|networkerror|load failed/i.test(message)) {
     return "Cannot reach the server. Check your internet connection and try again.";
   }

@@ -18,6 +18,15 @@ import { emptyState, errorState, toastOk, toastError, inlineAlert } from "../lib
 import { fetchClasses, fetchActiveTerm } from "../lib/data.js";
 import { hasRole, session } from "../lib/auth.js";
 
+// Module level on purpose. It was first declared inside render() below the
+// point where render awaits, so the grid ran before the declaration did and
+// the whole page failed with "Cannot access 'STATUS_BADGE' before
+// initialization". Found by running the page, not by reading it.
+const STATUS_BADGE = {
+  paid: ["badge-ok", "Paid"], partial: ["badge-info", "Part paid"],
+  unpaid: ["badge-warn", "Unpaid"], waived: ["badge-brass", "Waived"],
+};
+
 const MONEY = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
 
 export default async function render({ outlet }) {
@@ -114,6 +123,25 @@ export default async function render({ outlet }) {
     );
   }
 
+  /* Status is decided by the database (app.student_fees_settled and
+     public.fee_status_detail, migration 0028). This mirrors it only so the
+     grid can show the effect of an edit before it is saved. */
+  function modeOf(payment) {
+    if (payment?.waived) return "waived";
+    if (payment?.is_paid_override === true) return "paid";
+    if (payment?.is_paid_override === false) return "unpaid";
+    return "auto";
+  }
+
+  function statusOf(mode, amount, expected, hasRow) {
+    if (mode === "waived") return "waived";
+    if (mode === "paid") return "paid";
+    if (mode === "unpaid") return amount > 0 ? "partial" : "unpaid";
+    if (!hasRow) return "unpaid";
+    if (amount >= expected) return "paid";
+    return amount > 0 ? "partial" : "unpaid";
+  }
+
   function grid() {
     if (!state.students.length) return emptyState({ title: "No students in this class", body: "Admit students from the Students page first." });
 
@@ -121,23 +149,43 @@ export default async function render({ outlet }) {
     const expected = Number(state.structure?.amount || 0);
 
     const rows = state.students.map((s) => {
-      const amountInput = h("input.input.u-num", { type: "number", min: "0", step: "100", style: { maxWidth: "130px" },
+      const current = { mode: modeOf(s.payment), amount: Number(s.payment?.amount_paid || 0) };
+      const statusCell = h("td.num");
+      const balanceCell = h("td.num");
+
+      const paint = () => {
+        const mode = s._mode ?? current.mode;
+        const amount = s._amount ?? current.amount;
+        const [cls, label] = STATUS_BADGE[statusOf(mode, amount, expected, !!s.payment || s.dirty)];
+        mount(statusCell, h(`span.badge.${cls}`, { text: label }));
+        balanceCell.textContent = mode === "waived" ? "—" : MONEY.format(Math.max(expected - amount, 0));
+      };
+
+      const amountInput = h("input.input.u-num", {
+        type: "number", min: "0", step: "100", style: { maxWidth: "130px" }, "aria-label": `Amount paid by ${s.full_name}`,
         value: s.payment?.amount_paid ?? "0",
-        oninput: (e) => { s._amount = Number(e.target.value); state.dirty.add(s.id); } });
+        oninput: (e) => { s._amount = Number(e.target.value) || 0; state.dirty.add(s.id); s.dirty = true; paint(); },
+      });
 
-      const overrideSel = h("select.select", { style: { maxWidth: "130px" } },
-        h("option", { value: "", selected: s.payment?.is_paid_override == null, text: "Auto" }),
-        h("option", { value: "true", selected: s.payment?.is_paid_override === true, text: "Force paid" }),
-        h("option", { value: "false", selected: s.payment?.is_paid_override === false, text: "Force unpaid" }));
-      overrideSel.addEventListener("change", () => { s._override = overrideSel.value; state.dirty.add(s.id); });
+      const modeSel = h("select.select", { style: { maxWidth: "150px" }, "aria-label": `Fee status for ${s.full_name}` },
+        [["auto", "Automatic"], ["paid", "Mark as paid"], ["unpaid", "Mark as unpaid"], ["waived", "Waived / approved"]]
+          .map(([v, l]) => h("option", { value: v, selected: current.mode === v, text: l })));
+      modeSel.addEventListener("change", () => { s._mode = modeSel.value; state.dirty.add(s.id); s.dirty = true; paint(); });
 
-      const settled = s.payment?.is_paid_override != null ? s.payment.is_paid_override : Number(s.payment?.amount_paid || 0) >= expected;
+      const reason = h("input.input", {
+        placeholder: "Reason (needed when waived)", maxlength: "120", value: s.payment?.waived_reason || "",
+        "aria-label": `Reason for ${s.full_name}`,
+        oninput: (e) => { s._reason = e.target.value; state.dirty.add(s.id); },
+      });
 
+      paint();
       return h("tr", {},
         h("td", {}, h("div", { style: { fontWeight: "600" }, text: s.full_name }), h("div.u-xs.u-muted", { text: s.admission_no })),
         h("td.num", {}, amountInput),
-        h("td.num", {}, overrideSel),
-        h("td.num", {}, settled ? h("span.badge.badge-ok", { text: "Paid" }) : h("span.badge.badge-warn", { text: "Unpaid" })),
+        balanceCell,
+        h("td.num", {}, modeSel),
+        h("td", {}, reason),
+        statusCell,
       );
     });
 
@@ -145,7 +193,9 @@ export default async function render({ outlet }) {
 
     return h("div.card.card-flush", {},
       h("div.table-wrap", {}, h("table.table", {},
-        h("thead", {}, h("tr", {}, h("th", { text: "Student" }), h("th.num", { text: "Amount paid" }), h("th.num", { text: "Override" }), h("th.num", { text: "Status" }))),
+        h("thead", {}, h("tr", {},
+          h("th", { text: "Student" }), h("th.num", { text: "Amount paid" }), h("th.num", { text: "Balance" }),
+          h("th.num", { text: "Status" }), h("th", { text: "Note" }), h("th.num", { text: "Result" }))),
         h("tbody", {}, rows),
       )),
       h("div", { style: { padding: "16px" } }, saveBtn),
@@ -154,22 +204,35 @@ export default async function render({ outlet }) {
 
   async function save(saveBtn) {
     const changed = state.students.filter((s) => state.dirty.has(s.id));
-    if (!changed.length) return;
-    const rows = changed.map((s) => ({
-      school_id: session.schoolId,
-      student_id: s.id,
-      term_id: state.term.id,
-      amount_paid: s._amount ?? s.payment?.amount_paid ?? 0,
-      is_paid_override: s._override === "" || s._override == null ? (s.payment?.is_paid_override ?? null) : s._override === "true",
-      recorded_by: session.staffId || null,
-    }));
+    if (!changed.length) return toastOk("Nothing to save");
+
+    const rows = [];
+    for (const s of changed) {
+      const mode = s._mode ?? modeOf(s.payment);
+      const reason = (s._reason ?? s.payment?.waived_reason ?? "").trim();
+      if (mode === "waived" && !reason) {
+        return toastError(`Add a reason for waiving ${s.full_name}'s fees.`);
+      }
+      rows.push({
+        school_id: session.schoolId, student_id: s.id, term_id: state.term.id,
+        amount_paid: s._amount ?? s.payment?.amount_paid ?? 0,
+        // "Automatic" really clears the override now. The earlier version
+        // kept the old value when Automatic was chosen, so a bursar could
+        // never undo a forced status.
+        is_paid_override: mode === "paid" ? true : mode === "unpaid" ? false : null,
+        waived: mode === "waived",
+        waived_reason: mode === "waived" ? reason : null,
+        recorded_by: session.staffId || null,
+      });
+    }
+
     setBusy(saveBtn, true, "Saving…");
     try {
       unwrap(await supabase.from("fee_payments").upsert(rows, { onConflict: "student_id,term_id" }), "save payments");
       toastOk("Payments saved");
       await loadClass();
     } catch (err) {
-      toastError(humanError(err));
+      toastError(humanError(err, "Payments could not be saved."));
     } finally { setBusy(saveBtn, false); }
   }
 }

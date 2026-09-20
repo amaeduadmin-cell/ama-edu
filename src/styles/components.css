@@ -344,3 +344,20 @@
   font-size: var(--t-xs);
   color: var(--ama-slate);
 }
+
+/* Three-column form grid — used by the attendance controls and the
+   platform CMS, which have more fields per row than a normal form. */
+@media (min-width: 900px) {
+  .form-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+}
+
+/* Avatar fallback for a person with no photo (parent portal). */
+.avatar {
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--ama-green-soft);
+  color: var(--ama-green-deep);
+  font-weight: 700;
+  flex: none;
+}

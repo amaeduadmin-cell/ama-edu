@@ -22,6 +22,11 @@ export const TEMPLATES = [
     name: "Template 2 — Compact",
     blurb: "Continuous assessment combined into one column, with a larger remarks panel. Best for many subjects or narrow paper.",
   },
+  {
+    code: "heritage",
+    name: "Template 3 — Heritage",
+    blurb: "A bordered three-column info box, a banner-style title and a bottom signatures row, in the classic Nigerian report-sheet look.",
+  },
 ];
 
 export function previewTemplate(code, { school, components } = {}) {

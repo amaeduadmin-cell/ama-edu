@@ -2,8 +2,8 @@
 
 import "../styles/marketing.css";
 import { h, mount } from "../lib/dom.js";
-import { toSlug, validateSlug, ROOT } from "../lib/tenant.js";
-import { navigate } from "../lib/router.js";
+import { ROOT } from "../lib/tenant.js";
+import { renderReportCard, sampleReportCardData } from "../lib/reportcard.js";
 
 export default function render({ outlet }) {
   document.title = "AMA EDU — school management for Nigerian schools";
@@ -31,47 +31,18 @@ function siteNav() {
 /* ---------------- Hero ----------------
    The artefact on the right is a report card, because that document
    is the thing this whole system exists to produce, and the one part
-   of a school's paperwork every parent already knows on sight. */
+   of a school's paperwork every parent already knows on sight. It is
+   drawn through renderReportCard() itself (Template 3 — Heritage), so
+   what a visitor sees here is exactly what a school actually gets,
+   never a hand-built lookalike. */
 function hero() {
-  const input = h("input.input", {
-    id: "claim", type: "text", autocomplete: "off", autocapitalize: "off",
-    spellcheck: "false", placeholder: "yourschool", "aria-describedby": "claimNote",
-  });
-  const note = h("div.claim-note#claimNote", { text: `Your portal will live at yourschool.${ROOT}` });
-
-  input.addEventListener("input", () => {
-    const slug = toSlug(input.value);
-    if (input.value && slug !== input.value) input.value = slug;
-    if (!slug) {
-      note.className = "claim-note";
-      note.textContent = `Your portal will live at yourschool.${ROOT}`;
-      return;
-    }
-    const check = validateSlug(slug);
-    note.className = `claim-note ${check.ok ? "is-good" : "is-bad"}`;
-    note.textContent = check.ok ? `${slug}.${ROOT} looks good` : check.reason;
-  });
-
-  const go = () => {
-    const slug = toSlug(input.value);
-    navigate(slug ? `/register?slug=${encodeURIComponent(slug)}` : "/register");
-  };
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } });
-
   return h("section.hero", {},
     h("div.shell-width", {},
       h("div.hero-grid", {},
         h("div", {},
           h("h1", { text: "Every result, every term, every school." }),
           h("p.hero-lede", { text: "AMA EDU runs the whole school on one system — enrolment, scores, report cards, fees and parent access. Each school gets its own portal and its own data, kept completely separate from every other school." }),
-          h("div.claim", {},
-            h("div.claim-row", {},
-              input,
-              h("span.affix", { text: `.${ROOT}` }),
-              h("button.btn.btn-primary", { type: "button", text: "Claim it", onclick: go }),
-            ),
-            note,
-          ),
+          h("a.btn.btn-primary.btn-lg", { href: "/register", text: "Register a school" }),
         ),
         h("div.slip-stage", {},
           h("span.slip-tag.t1", { text: "Positions calculated automatically" }),
@@ -82,47 +53,11 @@ function hero() {
 }
 
 function reportSlip() {
-  const rows = [
-    ["English Language", 17, 18, 19, 68, 92, "A", "1st"],
-    ["Mathematics",      15, 16, 18, 61, 84, "B", "3rd"],
-    ["Basic Science",    18, 17, 19, 65, 89, "A", "2nd"],
-    ["Qur'an",           19, 19, 20, 70, 95, "A", "1st"],
-    ["Hausa Language",   14, 15, 16, 58, 79, "B", "6th"],
-  ];
-
-  return h("article.slip", { "aria-label": "Example report card" },
-    h("div.slip-head", {},
-      h("div.slip-crest", { text: "P" }),
-      h("div", {},
-        h("div.slip-school", { text: "Pariya Academy for Modern Science & Qur'an" }),
-        h("div.slip-motto", { text: "Knowledge, character, service" }),
-      )),
-    h("div.slip-meta", {},
-      h("div", {}, "Student ", h("b", { text: "Amina Suleiman" })),
-      h("div", {}, "Class ", h("b", { text: "JSS 2" })),
-      h("div", {}, "Term ", h("b", { text: "Second, 2025/2026" })),
-    ),
-    h("table", {},
-      h("thead", {}, h("tr", {},
-        h("th", { text: "Subject" }),
-        h("th.n", { text: "CA1" }), h("th.n", { text: "CA2" }), h("th.n", { text: "CA3" }),
-        h("th.n", { text: "Exam" }), h("th.n", { text: "Total" }),
-        h("th.n", { text: "Grade" }), h("th.n", { text: "Pos" }),
-      )),
-      h("tbody", {}, rows.map(([subject, ca1, ca2, ca3, exam, total, grade, pos]) =>
-        h("tr", {},
-          h("td", { text: subject }),
-          h("td.n", { text: ca1 }), h("td.n", { text: ca2 }), h("td.n", { text: ca3 }),
-          h("td.n", { text: exam }), h("td.n", { text: total }),
-          h("td.n.g", { text: grade }), h("td.n", { text: pos }),
-        ))),
-    ),
-    h("div.slip-foot", {},
-      h("div.slip-total", {}, "Term average", h("b", { text: "87.8%" })),
-      h("div.slip-total", {}, "Position in class", h("b", { text: "2nd of 34" })),
-      h("div.slip-seal", {}, h("span", { text: "SCHOOL SEAL" })),
-    ),
-  );
+  const data = sampleReportCardData({
+    school: { name: "AmaEdu Academy", motto: "Knowledge, character, service" },
+    template: "heritage",
+  });
+  return h("div.rc3-frame", { "aria-label": "Example report card" }, renderReportCard(data));
 }
 
 /* ---------------- What it does ---------------- */

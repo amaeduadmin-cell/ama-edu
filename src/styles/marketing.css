@@ -62,8 +62,27 @@
 .claim-note.is-bad { color: var(--ama-danger); font-weight: 600; }
 .claim-note.is-good { color: var(--ama-green-deep); font-weight: 600; }
 
-/* ---------------- Hero artefact: the report card ---------------- */
+/* ---------------- Hero artefact: the report card ----------------
+   This is a live Template 3 (.rc-rich) card from reportcard.js, not a
+   hand-built lookalike — the frame only scales and tilts it down to
+   an artefact's size inside the hero. */
 .slip-stage { position: relative; perspective: 1400px; }
+.rc3-frame {
+  max-width: 460px;
+  margin-left: auto;
+  transform: rotate(-1.2deg);
+}
+@media (min-width: 980px) { .rc3-frame { transform: rotate(-1.6deg) rotateY(6deg); margin-left: 0; } }
+.rc3-frame .report-card.rc-rich {
+  font-size: 10.5px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow-3);
+  margin: 0;
+}
+.rc3-frame .rc3-title-block h2 { font-size: 15px; }
+.rc3-frame .rc3-table { font-size: 9px; }
+.rc3-frame .rc3-table th, .rc3-frame .rc3-table td { padding: 3px 4px; }
+
 .slip {
   position: relative;
   background: #fffefb;

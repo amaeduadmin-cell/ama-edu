@@ -117,6 +117,104 @@
 }
 .rc-footer-note { font-size: 10px; color: var(--ama-slate); margin-top: 10px; text-align: center; }
 
+/* ---------- Template 3: Heritage (rc-rich) ----------
+   Ported from the original MyPAS1 / newpariyacentral report-sheet:
+   navy-bordered sheet, a green banner pill for the title, a bordered
+   three-column info box, a blue table header and a red-bordered
+   remarks box. Kept entirely under .rc-rich / .rc3-* so it shares no
+   class names with Template 1 or 2 — nothing here can leak onto them. */
+.rc-rich {
+  --rc3-navy: #17325c;
+  --rc3-green: #1f7a3d;
+  --rc3-blue: #1e4fa0;
+  --rc3-blue-bg: #eaf1fc;
+  --rc3-red: #c0392b;
+  border: 2.5px solid var(--rc3-navy);
+  padding: 18px 20px;
+}
+
+.rc3-header { display: flex; align-items: flex-start; gap: 12px; }
+.rc3-crest {
+  flex: none; width: 60px; height: 60px; border-radius: 6px; overflow: hidden;
+  display: grid; place-items: center; background: var(--rc3-blue-bg); color: var(--rc3-navy);
+  font-weight: 700; font-size: 22px;
+}
+.rc3-crest img { width: 100%; height: 100%; object-fit: contain; }
+.rc3-title-block { flex: 1; min-width: 0; text-align: center; }
+.rc3-title-block h2 {
+  margin: 0 0 3px; font-size: 21px; font-weight: 800; letter-spacing: 0.02em;
+  text-transform: uppercase; color: var(--rc3-navy); font-family: var(--font-display);
+}
+.rc3-address { margin: 0 0 3px; font-size: 12px; font-weight: 600; }
+.rc3-contact { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 11px; font-weight: 600; color: var(--rc3-navy); }
+.rc3-motto { text-align: center; font-size: 12px; font-weight: 700; margin-top: 2px; }
+.rc3-motto span { color: var(--rc3-navy); }
+.rc3-photo-box { flex: none; width: 56px; height: 56px; border-radius: 6px; border: 2px solid var(--rc3-navy); background: var(--ama-surface-2); overflow: hidden; }
+.rc3-photo-box img { width: 100%; height: 100%; object-fit: cover; }
+
+.rc3-divider { border: 0; border-top: 1.5px solid var(--rc3-navy); opacity: 0.35; margin: 10px 0; }
+
+.rc3-banner-wrap { text-align: center; margin-bottom: 10px; }
+.rc3-banner {
+  display: inline-block; background: var(--rc3-green); color: #fff; font-size: 12px;
+  font-weight: 800; letter-spacing: 0.04em; padding: 6px 22px; border-radius: 999px; text-transform: uppercase;
+}
+
+.rc3-infobox { display: flex; border: 2px solid var(--rc3-navy); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; }
+.rc3-info-col { flex: 1; display: flex; flex-direction: column; border-right: 1.5px solid var(--rc3-navy); padding-right: 10px; margin-right: 10px; min-width: 0; }
+.rc3-info-col-last { border-right: 0; padding-right: 0; margin-right: 0; }
+.rc3-info-line { display: flex; justify-content: space-between; gap: 6px; padding: 4px 0; font-size: 12px; font-weight: 700; }
+.rc3-info-line + .rc3-info-line { border-top: 1px solid rgba(23, 50, 92, 0.25); }
+.rc3-label { color: var(--rc3-navy); font-weight: 800; white-space: nowrap; }
+.rc3-value { text-align: right; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rc3-perf-banner {
+  background: var(--rc3-blue); color: #fff; text-align: center; font-size: 11px;
+  font-weight: 800; letter-spacing: 0.03em; padding: 6px 8px; border-radius: 6px 6px 0 0; text-transform: uppercase;
+}
+
+.rc3-table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 12px; }
+.rc3-table th, .rc3-table td { border: 1px solid var(--rc3-blue); padding: 5px 6px; text-align: center; }
+.rc3-table td:nth-child(2) { text-align: left; }
+.rc3-table thead th { background: var(--rc3-blue-bg); color: var(--rc3-blue); font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
+.rc3-table tbody tr:nth-child(even) td { background: var(--rc3-blue-bg); }
+.rc3-total { font-weight: 800; }
+.rc3-grade { font-weight: 800; color: var(--rc3-green); }
+.rc3-remark-cell { font-size: 10.5px; color: var(--ama-slate); }
+
+.rc3-remarks-box { border: 1.5px solid var(--rc3-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; }
+.rc3-remark-line { font-size: 11.5px; font-weight: 700; padding: 2px 0; }
+.rc3-remark-line .rc3-label { color: var(--rc3-red); margin-right: 4px; }
+.rc3-muted { color: var(--ama-slate); font-weight: 500; }
+
+.rc3-bottom-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.rc3-sign { flex: 1 1 160px; min-width: 120px; text-align: center; }
+.rc3-sign-line { border-top: 1.5px solid #1a0f08; margin: 0 auto 4px; width: 80%; height: 18px; }
+.rc3-sign-label { font-size: 10px; color: var(--ama-slate); }
+.rc3-sign-name { font-size: 11px; font-weight: 700; }
+.rc3-seal {
+  flex: none; width: 68px; height: 68px; border-radius: 50%; border: 2px dashed var(--rc3-navy);
+  display: grid; place-items: center; text-align: center; font-size: 8px; font-weight: 700;
+  letter-spacing: 0.05em; color: var(--rc3-navy);
+}
+
+@media (max-width: 640px) {
+  .rc-rich { padding: 14px; }
+  .rc3-header { flex-wrap: wrap; }
+  .rc3-infobox { flex-direction: column; }
+  .rc3-info-col { border-right: 0; border-bottom: 1.5px solid var(--rc3-navy); padding-right: 0; margin-right: 0; padding-bottom: 6px; margin-bottom: 6px; }
+  .rc3-info-col-last { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+  .rc3-table { display: block; overflow-x: auto; white-space: nowrap; }
+}
+
+@media print {
+  .rc-rich { border: 2.5px solid var(--rc3-navy) !important; }
+  .rc3-banner, .rc3-perf-banner, .rc3-table thead th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 /* ---------- mobile ---------- */
 @media (max-width: 640px) {
   .report-card { padding: 16px 14px; }

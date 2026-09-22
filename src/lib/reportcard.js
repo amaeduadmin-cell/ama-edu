@@ -2,9 +2,12 @@
    Report card renderer — now a template BANK rather than one fixed
    design (migration 0019).
 
-     classic  Template 1: every assessment column shown separately.
-     compact  Template 2: CA columns collapsed into one total, in the
-              Pariya Central style, with more room for remarks.
+     classic   Template 1: every assessment column shown separately.
+     compact   Template 2: CA columns collapsed into one total, in the
+               Pariya Central style, with more room for remarks.
+     heritage  Template 3: bordered three-column info box, pill
+               banners and a signatures row — ported from the
+               original MyPAS1 report-sheet design (newpariyacentral).
 
    Which one is drawn comes from schools.report_card_template, so a
    school can switch design without touching a single stored result —
@@ -27,7 +30,9 @@ import { h, safeUrl } from "./dom.js";
  */
 export function renderReportCard(data) {
   const template = data.template || data.school?.report_card_template || "classic";
-  return template === "compact" ? compactCard(data) : classicCard(data);
+  if (template === "compact") return compactCard(data);
+  if (template === "heritage") return richCard(data);
+  return classicCard(data);
 }
 
 /* ---------------- shared pieces ---------------- */
@@ -235,6 +240,122 @@ function compactCard(data) {
     gradeKey(data),
     signatures(data),
   );
+}
+
+/* ---------------- Template 3: heritage ---------------- */
+/* Ported from newpariyacentral's buildReportCardHtml(): a navy-bordered
+   sheet with a banner-pill title, a three-column bordered info box and
+   a bottom signature row. Rebuilt here through h() rather than the
+   original's innerHTML string — a student's name, a remark and a
+   school's motto are untrusted text as far as this file is concerned,
+   same as the other two templates. Uses the same `data` shape (school,
+   student, class, term, scores, summary, components) as Template 1/2,
+   so it drops into every page that already renders a report card with
+   no extra fields required. */
+
+function richCard(data) {
+  const { school, student, class: klass, term, summary, settings } = data;
+  const components = activeComponents(data);
+  const { scores } = data;
+  const showPositions = settings?.show_positions !== false;
+
+  const logo = safeUrl(school?.logo_url);
+  const photo = settings?.show_photo === false ? null : safeUrl(student?.photo_url);
+  const contact = [school?.phone ? `☎ ${school.phone}` : null, school?.email ? `✉ ${school.email}` : null].filter(Boolean);
+  const colCount = components.length + 5 + (showPositions ? 1 : 0);
+
+  return h("article.report-card.rc-rich", {},
+    h("div.rc3-header", {},
+      h("div.rc3-crest", {}, logo
+        ? h("img", { src: logo, alt: "" })
+        : h("span", { "aria-hidden": "true", text: (school?.name || "AE").slice(0, 1).toUpperCase() })),
+      h("div.rc3-title-block", {},
+        h("h2", { text: school?.name || "Your School Name" }),
+        school?.address ? h("p.rc3-address", { text: school.address }) : null,
+        contact.length ? h("div.rc3-contact", {}, contact.map((t) => h("span", { text: t }))) : null,
+        school?.motto ? h("div.rc3-motto", {}, h("span", { text: "MOTTO: " }), String(school.motto).toUpperCase()) : null,
+      ),
+      h("div.rc3-photo-box", {}, photo ? h("img", { src: photo, alt: "" }) : null),
+    ),
+    h("hr.rc3-divider"),
+    h("div.rc3-banner-wrap", {},
+      h("span.rc3-banner", { text: `${term?.label ? term.label + " Term " : ""}Report Sheet`.toUpperCase() })),
+
+    h("div.rc3-infobox", {},
+      h("div.rc3-info-col", {},
+        rc3Line("Name", student?.full_name),
+        rc3Line("Total score", fmt(summary?.total_score)),
+        rc3Line("Average", summary?.average_score != null ? `${fmt(summary.average_score)}%` : "—"),
+        rc3Line("Grade", summary?.overall_grade),
+      ),
+      h("div.rc3-info-col", {},
+        rc3Line("Admission no.", student?.admission_no),
+        rc3Line("Class", klass?.name),
+        rc3Line("Subjects", summary?.subjects_count),
+        showPositions
+          ? rc3Line("Position", summary ? `${ordinal(summary.class_position)} of ${summary.class_size ?? "—"}` : "—")
+          : rc3Line("Term", term?.label),
+      ),
+      h("div.rc3-info-col.rc3-info-col-last", {},
+        rc3Line("Session", term?.sessions?.label),
+        settings?.show_attendance !== false ? rc3Line("Days present", summary?.days_present) : rc3Line("Term", term?.label),
+        settings?.show_attendance !== false ? rc3Line("Days absent", summary?.days_absent) : null,
+      ),
+    ),
+
+    h("div.rc3-perf-banner", { text: "Student's Academic Performance" }),
+    h("table.rc3-table", {},
+      h("thead", {}, h("tr", {},
+        h("th", { text: "S/N" }),
+        h("th", { text: "Subject" }),
+        components.map((c) => h("th.n", { text: `${c.label} /${fmt(c.max_score)}` })),
+        h("th.n", { text: "Total" }),
+        h("th.n", { text: "Grade" }),
+        showPositions ? h("th.n", { text: "Position" }) : null,
+        h("th", { text: "Remark" }),
+      )),
+      h("tbody", {}, scores?.length
+        ? scores.map((s, i) => h("tr", {},
+            h("td.n", { text: String(i + 1) }),
+            h("td", { text: subjectName(s) }),
+            components.map((c) => h("td.n", { text: fmt(s[c.code]) })),
+            h("td.n.rc3-total", { text: fmt(s.total) }),
+            h("td.n.rc3-grade", { text: s.grade || "—" }),
+            showPositions ? h("td.n", { text: ordinal(s.subject_position) }) : null,
+            h("td.rc3-remark-cell", { text: s.remark || remarkFor(data, s.total) || "—" }),
+          ))
+        : [emptyRow(colCount)]),
+    ),
+
+    h("div.rc3-remarks-box", {},
+      summary?.teacher_remark
+        ? h("div.rc3-remark-line", {}, h("span.rc3-label", { text: "Class teacher's remark: " }), summary.teacher_remark) : null,
+      summary?.head_remark
+        ? h("div.rc3-remark-line", {}, h("span.rc3-label", { text: "Head's remark: " }), summary.head_remark) : null,
+      (!summary?.teacher_remark && !summary?.head_remark)
+        ? h("div.rc3-remark-line.rc3-muted", { text: "No remarks recorded for this term." }) : null,
+    ),
+
+    h("div.rc3-bottom-row", {},
+      rc3Signature("Class teacher"),
+      h("div.rc3-seal", { text: "SCHOOL SEAL" }),
+      rc3Signature("Head / Principal", school?.headmaster_name || school?.principal_name),
+    ),
+    gradeKey(data),
+  );
+}
+
+function rc3Line(label, value) {
+  return h("div.rc3-info-line", {},
+    h("span.rc3-label", { text: label }),
+    h("span.rc3-value", { text: (value === null || value === undefined || value === "") ? "—" : value }));
+}
+
+function rc3Signature(label, name) {
+  return h("div.rc3-sign", {},
+    h("div.rc3-sign-line", { "aria-hidden": "true" }),
+    h("div.rc3-sign-label", { text: label }),
+    name ? h("div.rc3-sign-name", { text: name }) : null);
 }
 
 /* ---------------- helpers ---------------- */

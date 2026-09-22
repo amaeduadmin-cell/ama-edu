@@ -1,0 +1,77 @@
+diff a/supabase/functions/register-school/index.ts b/supabase/functions/register-school/index.ts	(rejected hunks)
+@@ -65,6 +65,16 @@ Deno.serve(async (req: Request) => {
+     const allowedTypes = ["nursery_primary", "secondary", "combined", "islamiyya", "other"];
+     const schoolType = allowedTypes.includes(school.school_type) ? school.school_type : "combined";
+ 
++    // Which sections the school actually operates. Anything not listed
++    // stays hidden throughout the portal until enabled from Settings.
++    const allowedSections = ["nursery", "primary", "jss", "ss", "islamiyya", "other"];
++    const rawSections: string[] = Array.isArray(school.sections) ? school.sections.map(String) : [];
++    const sections = rawSections.filter((x) => allowedSections.includes(x));
++    const chosenSections = sections.length ? sections : null;
++
++    const declared = Number(school.declared_student_count);
++    const declaredStudentCount = Number.isFinite(declared) && declared >= 0 ? Math.floor(declared) : null;
++
+     // Re-check availability server-side. The UI checks too, but that
+     // check is advisory -- this one and the unique index are binding.
+     const { data: available, error: availErr } = await admin.rpc("is_slug_available", { p_slug: slug });
+@@ -95,12 +105,23 @@ Deno.serve(async (req: Request) => {
+       email: schoolEmail,
+       phone: String(school.phone ?? "").trim() || null,
+       address: String(school.address ?? "").trim() || null,
++      declared_student_count: declaredStudentCount,
++      report_card_template: ["classic", "compact"].includes(school.report_card_template)
++        ? school.report_card_template : "classic",
+     }).select("id, slug").single();
+     if (schoolErr) throw schoolErr;
+     schoolId = schoolRow.id;
+ 
+     // 3. session, terms, grading scale, classes, curriculum
+-    const { error: bootErr } = await admin.rpc("bootstrap_school_defaults", { p_school_id: schoolId });
++    // bootstrap_school_defaults lives in the `app` schema, which
++    // PostgREST does not expose -- calling it directly 404s and leaves
++    // a school with no session, terms, classes or grading scale.
++    // bootstrap_new_school (migration 0026) is the public wrapper that
++    // runs both bootstrap steps and trims classes to the chosen sections.
++    const { error: bootErr } = await admin.rpc("bootstrap_new_school", {
++      p_school_id: schoolId,
++      p_sections: chosenSections,
++    });
+     if (bootErr) throw bootErr;
+ 
+     // 4. the administrator as a staff member of this school
+@@ -111,18 +132,22 @@ Deno.serve(async (req: Request) => {
+       full_name: adminName,
+       email: adminEmail,
+       position: "School Administrator",
++      // roles: ["admin"] is what migration 0018's trigger turns into a
++      // school_members row once user_id is set; the explicit upsert
++      // below is belt and braces rather than the only path.
++      roles: ["admin"],
+     }).select("id").single();
+     if (staffErr) throw staffErr;
+ 
+     // 5. the membership row that binds the account to this tenant.
+     //    Until this exists, app.current_school_id() returns null and
+     //    RLS shows the account nothing at all.
+-    const { error: memberErr } = await admin.from("school_members").insert({
++    const { error: memberErr } = await admin.from("school_members").upsert({
+       school_id: schoolId,
+       user_id: userId,
+       role: "admin",
+       staff_id: staffRow.id,
+-    });
++    }, { onConflict: "user_id,school_id,role" });
+     if (memberErr) throw memberErr;
+ 
+     await admin.from("audit_log").insert({
+@@ -131,7 +156,7 @@ Deno.serve(async (req: Request) => {
+       action: "school.registered",
+       entity: "schools",
+       entity_id: schoolId,
+-      detail: { slug, name },
++      detail: { slug, name, sections: chosenSections },
+     });
+ 
+     // Best-effort welcome email. A missing RESEND_API_KEY or a delivery

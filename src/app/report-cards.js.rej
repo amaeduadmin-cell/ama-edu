@@ -1,0 +1,39 @@
+diff a/src/app/report-cards.js b/src/app/report-cards.js	(rejected hunks)
+@@ -14,7 +14,7 @@ import { supabase } from "../lib/supabase.js";
+ import { unwrap, humanError, logError } from "../lib/errors.js";
+ import { emptyState, errorState } from "../lib/ui.js";
+ import { fetchClasses, fetchActiveTerm } from "../lib/data.js";
+-import { renderReportCard } from "../lib/reportcard.js";
++import { renderReportCard, loadReportCardContext } from "../lib/reportcard.js";
+ import { context } from "../main.js";
+ 
+ export default async function render({ outlet }) {
+@@ -29,14 +29,15 @@ export default async function render({ outlet }) {
+   }));
+ 
+   try {
+-    const [classes, term, weightsRows] = await Promise.all([
++    const [classes, term, rc] = await Promise.all([
+       fetchClasses(),
+       fetchActiveTerm(),
+-      unwrap(await supabase.from("score_weights").select("*").limit(1), "fetch weights"),
++      loadReportCardContext(supabase, unwrap),
+     ]);
+     state.classes = classes;
+     state.term = term;
+-    state.weights = weightsRows?.[0] || { ca1_max: 20, ca2_max: 20, ca3_max: 20, exam_max: 40 };
++    state.rc = rc;
++    state.weights = rc.weights || { ca1_max: 20, ca2_max: 20, ca3_max: 20, exam_max: 40 };
+     state.classId = classes[0]?.id || "";
+   } catch (err) {
+     logError("report-cards boot", err);
+@@ -107,6 +108,9 @@ export default async function render({ outlet }) {
+       mount(preview, renderReportCard({
+         school: context.school, student, class: klass, term: state.term,
+         scores, summary: summaryRows?.[0] || null, weights: state.weights,
++        template: context.school?.report_card_template,
++        components: state.rc.components, bands: state.rc.bands,
++        remarks: state.rc.remarks, settings: state.rc.settings,
+       }));
+     } catch (err) {
+       logError("load report", err);

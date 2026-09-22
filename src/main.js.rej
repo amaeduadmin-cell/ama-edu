@@ -1,0 +1,72 @@
+diff a/src/main.js b/src/main.js	(rejected hunks)
+@@ -14,10 +14,12 @@
+ import "./styles/tokens.css";
+ import "./styles/base.css";
+ import "./styles/components.css";
++import "./styles/reportcard.css";
+ 
+ import { getCurrentTenantSlug, fetchTenantConfig, applyTenantBranding } from "./lib/tenant.js";
+ import { register, setNotFound, setGuard, start, navigate } from "./lib/router.js";
+-import { loadSession, session, hasRole } from "./lib/auth.js";
++import { loadSession, session, hasRole, onSessionChange } from "./lib/auth.js";
++import { startRealtime, stopRealtime } from "./lib/realtime.js";
+ import { hasConfig } from "./lib/supabase.js";
+ import { logError } from "./lib/errors.js";
+ 
+@@ -72,6 +74,10 @@ async function boot() {
+   }
+ 
+   await loadSession();
++  // Live "something changed" signals for the signed-in school. Best-effort:
++  // if realtime is unavailable everything still works, pages just need a refresh.
++  onSessionChange(() => (session.authed ? startRealtime() : stopRealtime()));
++  if (session.authed) startRealtime();
+   await start();
+ }
+ 
+@@ -82,10 +88,14 @@ function registerPlatformRoutes() {
+   register("/register",         () => import("./pages/register.js"));
+   register("/login",            () => import("./pages/platform-login.js"));
+   register("/find-school",      () => import("./pages/find-school.js"));
++  register("/schools/:slug",    () => import("./pages/school-profile.js"));
++  register("/blog",             () => import("./pages/blog.js"));
++  register("/blog/:slug",       () => import("./pages/blog.js"));
+   register("/reset-password",   () => import("./pages/reset-password.js"));
+   register("/admin",            () => import("./app/platform/console.js"), { requires: "platform" });
+   register("/admin/schools",    () => import("./app/platform/schools.js"), { requires: "platform" });
+   register("/admin/schools/:id",() => import("./app/platform/school-detail.js"), { requires: "platform" });
++  register("/admin/content",    () => import("./app/platform/content.js"), { requires: "platform" });
+   setNotFound(() => import("./pages/not-found.js"));
+ 
+   setGuard(async (path) => {
+@@ -115,6 +125,13 @@ function registerTenantRoutes() {
+   register("/timetable",       page("timetable"),      staff);
+   register("/report-cards",    page("report-cards"),   staff);
+   register("/results",         page("results"),        staff);
++  register("/publication",     page("publication"),    staff);
++  register("/attendance",      page("attendance"),     staff);
++  register("/assessments",     page("assessments"),    staff);
++  register("/assignments",     page("assignments"),    staff);
++  register("/my-exams",        page("my-exams"),       staff);
++  register("/my-children",     page("parent"),         staff);
++  register("/overview",        page("director"),       staff);
+   register("/master-list",     page("master-list"),    staff);
+   register("/certificates",    page("certificates"),   staff);
+   register("/analytics",       page("analytics"),      staff);
+@@ -122,6 +139,7 @@ function registerTenantRoutes() {
+   register("/announcements",   page("announcements"),  staff);
+   register("/import",          page("import"),         staff);
+   register("/settings",        page("settings"),       staff);
++  register("/academic-settings", page("academic-settings"), staff);
+   register("/my-report",       page("my-report"),      staff);
+   register("/unauthorized",    () => import("./pages/unauthorized.js"));
+ 
+@@ -143,6 +161,8 @@ function registerTenantRoutes() {
+ /** Where a signed-in user should land, by role. */
+ export function landingRouteFor() {
+   if (hasRole("student")) return "/my-report";
++  if (hasRole("parent")) return "/my-children";
++  if (hasRole("director") && session.roles.length === 1) return "/overview";
+   if (hasRole("bursar") && session.roles.length === 1) return "/fees";
+   if (hasRole("registrar_primary", "registrar_secondary") && session.roles.length === 1) return "/students";
+   return "/dashboard";

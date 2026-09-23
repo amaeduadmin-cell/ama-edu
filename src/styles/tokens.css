@@ -1,130 +1,97 @@
-/* ===============================================================
-   AMA EDU — design tokens
-   ---------------------------------------------------------------
-   Two layers on purpose:
-
-   --ama-*    platform identity. Fixed. Used by the marketing site,
-              the registration flow and the platform admin console.
-   --brand-*  the ACTIVE SCHOOL's identity. Defaults to the platform
-              palette and is overwritten at runtime by
-              applyTenantBranding() once the tenant config loads.
-
-   Anything inside a school portal styles itself from --brand-*, so a
-   school changes its colours from Settings without a code change.
-   =============================================================== */
-
 :root {
-  /* Platform palette ------------------------------------------- */
-  --ama-ink:        #12211b;   /* deep green-black; body text */
-  --ama-ink-2:      #24352c;
-  --ama-slate:      #5c6b63;   /* secondary text */
-  --ama-slate-2:    #84968c;
-  --ama-paper:      #f7f8f5;   /* page background */
-  --ama-surface:    #ffffff;
-  --ama-surface-2:  #f1f4ef;
-  --ama-line:       #dde3dc;
-  --ama-line-2:     #eef1ec;
+  /* ==========================================================================
+     COLOR SYSTEM - Deep Educational Green + Dark Slate + Subtle Brass Gold
+     ========================================================================== */
+  
+  /* Primary Green Palette */
+  --color-primary-50: #f0fdf4;
+  --color-primary-100: #dcfce7;
+  --color-primary-200: #bbf7d0;
+  --color-primary-300: #86efac;
+  --color-primary-400: #4ade80;
+  --color-primary-500: #22c55e;
+  --color-primary-600: #16a34a;
+  --color-primary-700: #15803d;
+  --color-primary-800: #166534;
+  --color-primary-900: #14532d;
+  --color-primary-950: #0b3b24;
 
-  --ama-green:      #0f6b3f;   /* primary — dark green */
-  --ama-green-deep: #0a4e2e;   /* headings, top nav, brand bar */
-  --ama-green-darker: #063a22;
-  --ama-green-soft: #e6f1ea;
-  --ama-brass:      #b8862b;   /* accent — crest/seal/medal */
-  --ama-brass-soft: #f6efdd;
+  /* Accent Gold / Brass (Used sparingly) */
+  --color-accent-50: #fffbeb;
+  --color-accent-100: #fef3c7;
+  --color-accent-200: #fde68a;
+  --color-accent-500: #d97706;
+  --color-accent-600: #b45309;
+  --color-accent-700: #92400e;
 
-  /* Secondary family. The brief was "don't make every component
-     green": emerald carries active states, progress and highlights so
-     the dark green stays reserved for brand and structure. */
-  --ama-emerald:      #1f9d61;
-  --ama-emerald-deep: #157a4a;
-  --ama-emerald-soft: #e8f7ef;
+  /* Dark Slate / Charcoal (Typography & Dark Surfaces) */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #080d1a;
 
-  /* Neutral surfaces — off-white rather than pure white, so cards
-     read as paper against the page and print cleanly. */
-  --ama-mist:       #fbfcfa;
-  --ama-shade:      #ecefe9;
+  /* Semantic Aliases */
+  --bg-app: var(--color-slate-50);
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #f8fafc;
+  --bg-surface-primary-tint: #f0fdf4;
+  --bg-dark-header: #0b3b24;
+  
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #64748b;
+  --text-on-primary: #ffffff;
 
-  --ama-danger:      #b3261e;
-  --ama-danger-soft: #fbeae9;
-  --ama-warn:        #8a5a00;
-  --ama-warn-soft:   #fdf2dc;
-  --ama-info:        #0b5c8a;
-  --ama-info-soft:   #e4f0f7;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-brand: #bbf7d0;
 
-  /* Active school branding (runtime-overridable) ---------------- */
-  --brand-primary:      var(--ama-green);
-  --brand-primary-deep: var(--ama-green-deep);
-  --brand-primary-soft: var(--ama-green-soft);
-  --brand-accent:       var(--ama-brass);
-  --brand-on-primary:   #ffffff;
+  /* ==========================================================================
+     TYPOGRAPHY SYSTEM
+     ========================================================================== */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Plus Jakarta Sans', var(--font-sans);
 
-  /* Type -------------------------------------------------------- */
-  --font-ui: "Public Sans", ui-sans-serif, system-ui, -apple-system,
-             "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-size-xs: 0.75rem;     /* 12px */
+  --font-size-sm: 0.875rem;    /* 14px */
+  --font-size-base: 1rem;      /* 16px */
+  --font-size-lg: 1.125rem;    /* 18px */
+  --font-size-xl: 1.25rem;     /* 20px */
+  --font-size-2xl: 1.5rem;     /* 24px */
+  --font-size-3xl: 1.875rem;   /* 30px */
+  --font-size-4xl: 2.25rem;    /* 36px */
+  --font-size-5xl: 3rem;       /* 48px */
 
-  /* Scale is a modest 1.2 ratio — this is a dense admin product,
-     not a marketing microsite, so headings stay close to body size. */
-  --t-xs:   0.75rem;
-  --t-sm:   0.8125rem;
-  --t-base: 0.9375rem;
-  --t-md:   1.0625rem;
-  --t-lg:   1.25rem;
-  --t-xl:   1.5rem;
-  --t-2xl:  2rem;
-  --t-3xl:  2.75rem;
-  --t-4xl:  3.5rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 
-  /* Space — 4px base */
-  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
-  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
+  /* ==========================================================================
+     ELEVATION & SHADOWS
+     ========================================================================== */
+  --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.03);
+  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.10), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
 
-  /* Radius is deliberately varied by role, not one value on
-     everything: sheets are square-ish, controls are soft. */
-  --r-sheet: 6px;
-  --r-card:  10px;
-  --r-ctrl:  8px;
-  --r-pill:  999px;
+  /* Radius */
+  --radius-sm: 0.375rem;  /* 6px */
+  --radius-md: 0.5rem;    /* 8px */
+  --radius-lg: 0.75rem;   /* 12px */
+  --radius-xl: 1rem;      /* 16px */
+  --radius-2xl: 1.5rem;   /* 24px */
+  --radius-full: 9999px;
 
-  --shadow-1: 0 1px 2px rgba(18, 33, 27, 0.06),
-              0 1px 3px rgba(18, 33, 27, 0.04);
-  --shadow-2: 0 4px 12px rgba(18, 33, 27, 0.07),
-              0 1px 3px rgba(18, 33, 27, 0.05);
-  --shadow-3: 0 18px 44px rgba(18, 33, 27, 0.14);
-
-  --sidebar-w: 248px;
-  --topbar-h: 60px;
-  --maxw: 1180px;
-
-  --ease: cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-/* Dark mode is a school-portal comfort feature (long score-entry
-   sessions), so it keeps the same hues at lower luminance rather
-   than switching to a different palette. */
-[data-theme="dark"] {
-  --ama-ink:       #e8efe9;
-  --ama-ink-2:     #c7d5cb;
-  --ama-slate:     #93a79a;
-  --ama-paper:     #0d1712;
-  --ama-surface:   #141f19;
-  --ama-surface-2: #1b2821;
-  --ama-line:      #27352d;
-  --ama-line-2:    #1f2c25;
-
-  --ama-green-soft: #16301f;
-  --ama-emerald:      #35b87a;
-  --ama-emerald-deep: #2a9c66;
-  --ama-emerald-soft: #14301f;
-  --ama-mist:       #111c16;
-  --ama-shade:      #1b2821;
-  --ama-brass-soft: #2e2510;
-  --ama-danger-soft:#2f1512;
-  --ama-warn-soft:  #2c2109;
-  --ama-info-soft:  #10262f;
-
-  --brand-primary-soft: #16301f;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.45);
-  --shadow-3: 0 18px 44px rgba(0, 0, 0, 0.55);
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }

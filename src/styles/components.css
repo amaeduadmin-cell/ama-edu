@@ -361,3 +361,32 @@
   font-weight: 700;
   flex: none;
 }
+
+
+/* ---------------- AmaEdu portal shell refinement ---------------- */
+.shell { background: radial-gradient(circle at 100% 0, color-mix(in srgb, var(--brand-primary-soft) 42%, transparent), transparent 30rem), var(--ama-paper); }
+.sidebar { background: color-mix(in srgb, var(--ama-surface) 92%, var(--brand-primary-soft)); border-right-color: color-mix(in srgb, var(--brand-primary) 14%, var(--ama-line)); box-shadow: 8px 0 30px rgba(18,33,27,.035); }
+.sidebar-head { min-height: 76px; padding: 18px; }
+.sidebar-crest { width: 38px; height: 38px; border-radius: 12px 12px 12px 4px; box-shadow: 3px 3px 0 var(--brand-accent); }
+.sidebar-school { font-size: 13px; }
+.sidebar-nav { padding: 12px 10px; }
+.sidebar-group { padding: 20px 12px 7px; font-size: 10px; letter-spacing: .11em; text-transform: uppercase; }
+.sidebar-item { min-height: 42px; border-radius: 10px; transition: background .18s var(--ease), transform .18s var(--ease), color .18s var(--ease); }
+.sidebar-item:hover { transform: translateX(2px); }
+.sidebar-item.active { box-shadow: inset 3px 0 var(--brand-primary); }
+.sidebar-item .si-icon { width: 9px; height: 9px; border-radius: 50%; background: currentColor; opacity: .42; font-size: 0; }
+.sidebar-item.active .si-icon { opacity: 1; }
+.sidebar-foot { display: flex; align-items: center; gap: 8px; padding: 16px; }
+.sidebar-foot-mark { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px 6px 6px 2px; background: var(--brand-primary); color: #fff; font-size: 10px; font-weight: 800; }
+.topbar { height: 76px; padding-inline: clamp(16px, 3vw, 30px); background: color-mix(in srgb, var(--ama-paper) 84%, transparent); border-bottom-color: color-mix(in srgb, var(--brand-primary) 12%, var(--ama-line)); }
+.topbar-title { font-size: 19px; letter-spacing: -.025em; }
+.topbar-eyebrow { font-weight: 700; letter-spacing: .02em; }
+.icon-btn { border-radius: 10px; }
+.main { max-width: 1480px; }
+.card, .stat { border-color: color-mix(in srgb, var(--brand-primary) 10%, var(--ama-line)); border-radius: 16px; box-shadow: 0 10px 30px rgba(18,33,27,.035); }
+.stat { transition: transform .18s var(--ease), box-shadow .18s var(--ease); }
+.stat:hover { transform: translateY(-3px); box-shadow: 0 14px 32px rgba(18,33,27,.09); }
+.stat-value { letter-spacing: -.04em; }
+.page-head { padding-top: 4px; }
+.app-footer { border-top-color: color-mix(in srgb, var(--brand-primary) 10%, var(--ama-line)); }
+@media (max-width: 1023px) { .topbar { height: 68px; } .main { padding-top: 22px; } }

@@ -223,7 +223,7 @@ function buildSidebar() {
             href, "aria-current": path === href ? "page" : null,
           }, h("span.si-icon", { "aria-hidden": "true", text: "•" }), label)),
       ])),
-    h("div.sidebar-foot", { text: "AMA EDU" }),
+      h("div.sidebar-foot", {}, h("span.sidebar-foot-mark", { text: "A" }), h("span", { text: "AMA EDU" })),
   );
 }
 

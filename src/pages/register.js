@@ -51,14 +51,14 @@ export default function render({ outlet }) {
   };
 
   let step = 0;
-  const host = h("div.panel-page", {});
+  const host = h("div.panel-page.registration-page", {});
   mount(outlet, host);
   draw();
 
   function draw() {
     mount(host,
       h("a.wordmark", { href: "/", style: { marginBottom: "20px" } }, "AMA ", h("b", { text: "EDU" })),
-      h("div.panel.wide", {},
+      h("div.panel.wide.registration-panel", {},
         h("div.steps", { "aria-hidden": "true" },
           [0, 1, 2, 3].map(i => h(`div.step${i <= step ? ".done" : ""}`))),
         h("div.panel-head", {},

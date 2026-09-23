@@ -1,98 +1,53 @@
-/* AMA EDU — reset + typography base */
-
-*, *::before, *::after { box-sizing: border-box; }
-
-html { -webkit-text-size-adjust: 100%; }
-
-body {
+*, *::before, *::after {
+  box-sizing: border-box;
   margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--t-base);
-  line-height: 1.55;
-  color: var(--ama-ink);
-  background: var(--ama-paper);
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4 {
-  margin: 0;
-  font-weight: 600;
-  line-height: 1.18;
-  letter-spacing: -0.012em;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--color-slate-900);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
 }
-
-h1 { font-size: var(--t-2xl); }
-h2 { font-size: var(--t-xl); }
-h3 { font-size: var(--t-md); }
-h4 { font-size: var(--t-base); }
-
-p { margin: 0 0 var(--s-3); max-width: 68ch; }
 
 a {
-  color: var(--brand-primary);
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1px;
+  color: var(--color-primary-800);
+  text-decoration: none;
+  transition: color var(--transition-fast);
 }
 
-img { max-width: 100%; height: auto; display: block; }
-
-button, input, select, textarea { font: inherit; color: inherit; }
-
-table { border-collapse: collapse; width: 100%; }
-
-/* Visible, consistent keyboard focus everywhere. */
-:focus-visible {
-  outline: 2px solid var(--brand-primary);
-  outline-offset: 2px;
-  border-radius: 3px;
-}
-:focus:not(:focus-visible) { outline: none; }
-
-::selection { background: var(--brand-primary-soft); color: var(--ama-ink); }
-
-/* Display face is reserved for the wordmark, marketing headlines and
-   printed documents (report cards, certificates) — never for UI chrome. */
-.display {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-variation-settings: "SOFT" 20, "WONK" 0;
+a:hover {
+  color: var(--color-primary-950);
 }
 
-.u-muted   { color: var(--ama-slate); }
-.u-small   { font-size: var(--t-sm); }
-.u-xs      { font-size: var(--t-xs); }
-.u-num     { font-variant-numeric: tabular-nums; }
-.u-center  { text-align: center; }
-.u-right   { text-align: right; }
-.u-nowrap  { white-space: nowrap; }
-.u-hide    { display: none !important; }
-.u-stack   { display: flex; flex-direction: column; gap: var(--s-3); }
-.u-row     { display: flex; align-items: center; gap: var(--s-3); }
-.u-wrap    { flex-wrap: wrap; }
-.u-grow    { flex: 1 1 auto; min-width: 0; }
-.u-mt-4    { margin-top: var(--s-4); }
-.u-mt-6    { margin-top: var(--s-6); }
-
-.sr-only {
-  position: absolute; width: 1px; height: 1px;
-  padding: 0; margin: -1px; overflow: hidden;
-  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+input, button, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
 }
 
-.shell-width { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: var(--s-5); }
+.container {
+  width: 100%;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
-}
-
-@media print {
-  .no-print { display: none !important; }
-  body { background: #fff; color: #000; }
 }

@@ -26,7 +26,8 @@ import { templatePicker } from "../lib/template-picker.js";
 
 const TABS = [
   ["sections", "School sections"], ["assessment", "Assessment system"], ["grading", "Grading"],
-  ["remarks", "Grade remarks"], ["results", "Results & fees"], ["reportcard", "Report card"],
+  ["remarks", "Grade remarks"], ["results", "Results & fees"],
+  ["admission", "Admission numbers"], ["reportcard", "Report card"],
 ];
 
 const SECTIONS = [
@@ -73,19 +74,23 @@ export default async function render({ outlet }) {
 
   async function load() {
     try {
-      const [schoolRows, sections, components, bands, remarks, rcRows, counts] = await Promise.all([
-        unwrap(await supabase.from("schools").select("id, name, motto, address, phone, logo_url, report_card_template, result_fee_policy, teachers_may_publish, declared_student_count").eq("id", session.schoolId).limit(1), "school"),
+      const [schoolRows, sections, components, bands, remarks, rcRows, counts, admissionPreview, signatories] = await Promise.all([
+        unwrap(await supabase.from("schools").select("id, name, motto, address, phone, logo_url, report_card_template, result_fee_policy, teachers_may_publish, declared_student_count, admission_prefix, admission_pad_width, admission_next_no").eq("id", session.schoolId).limit(1), "school"),
         unwrap(await supabase.from("school_sections").select("section, is_enabled"), "sections"),
         unwrap(await supabase.from("assessment_components").select("code, label, max_score, is_active, sort_order").order("sort_order"), "components"),
         unwrap(await supabase.from("grading_bands").select("grade, min_score, max_score, remark, is_pass, sort_order").order("min_score"), "bands"),
         unwrap(await supabase.from("grade_remarks").select("min_score, max_score, remark, sort_order").order("min_score"), "remarks"),
         unwrap(await supabase.from("school_report_card_settings").select("*").eq("school_id", session.schoolId).limit(1), "rc settings"),
         unwrap(await supabase.rpc("school_billing_counts", { p_school_id: session.schoolId }), "counts"),
+        unwrap(await supabase.rpc("admission_scheme_preview"), "admission preview"),
+        unwrap(await supabase.rpc("report_card_signatories"), "signatories"),
       ]);
       state.data = {
         school: schoolRows?.[0] || {}, sections, components, bands, remarks,
         rc: rcRows?.[0] || { head_title: "TERM REPORT CARD", show_photo: true, show_attendance: true, show_positions: true },
         counts: Array.isArray(counts) ? counts[0] : counts,
+        admission: Array.isArray(admissionPreview) ? admissionPreview[0] : admissionPreview,
+        signatories: signatories || [],
       };
       draw();
     } catch (err) {
@@ -100,7 +105,7 @@ export default async function render({ outlet }) {
         type: "button", role: "tab", "aria-selected": String(state.tab === k), text: label,
         onclick: () => { state.tab = k; draw(); },
       })));
-    const panel = { sections, assessment, grading, remarks, results, reportcard }[state.tab]();
+    const panel = { sections, assessment, grading, remarks, results, admission, reportcard }[state.tab]();
     mount(body, tabs, panel);
   }
 
@@ -341,7 +346,113 @@ export default async function render({ outlet }) {
       h("div.u-row", { style: { justifyContent: "flex-end", marginTop: "12px" } }, saveBtn));
   }
 
-  /* ---------------- 6. report card ---------------- */
+  /* ---------------- 6. admission numbers ---------------- */
+  function admission() {
+    const s = state.data.school;
+    const a = state.data.admission || {};
+    const prefixInput = h("input.input", { value: s.admission_prefix || "", maxlength: "20", style: { maxWidth: "160px" }, placeholder: "e.g. ADM" });
+    const widthInput = h("input.input.u-num", { type: "number", min: "1", max: "8", step: "1", value: s.admission_pad_width ?? 4, style: { maxWidth: "100px" } });
+    const previewBox = h("div.u-row", { style: { gap: "24px", flexWrap: "wrap" } });
+    const saveBtn = h("button.btn.btn-primary", { type: "button", text: "Save & sync from records" });
+    const errorSlot = h("div");
+
+    function paintPreview(p) {
+      mount(previewBox,
+        stat("Next admission number", p?.next_admission_no || "—"),
+        stat("Last issued", p?.last_issued || "—"),
+        stat("Active students", p?.total_active_students ?? 0),
+      );
+    }
+    paintPreview(a);
+
+    saveBtn.addEventListener("click", async () => {
+      mount(errorSlot);
+      const prefix = prefixInput.value.trim();
+      const width = Number(widthInput.value);
+      if (!/^[A-Za-z0-9/_-]{1,20}$/.test(prefix)) {
+        return mount(errorSlot, inlineAlert("Prefix may only contain letters, digits, / - _ (1 to 20 characters)."));
+      }
+      if (!(width >= 1 && width <= 8)) {
+        return mount(errorSlot, inlineAlert("Digits (padding) must be between 1 and 8."));
+      }
+      setBusy(saveBtn, true, "Syncing…");
+      try {
+        if (width !== s.admission_pad_width) {
+          unwrap(await supabase.from("schools").update({ admission_pad_width: width }).eq("id", session.schoolId), "save pad width");
+        }
+        const rows = unwrap(await supabase.rpc("sync_admission_scheme", { p_prefix: prefix }), "sync admission scheme");
+        const result = Array.isArray(rows) ? rows[0] : rows;
+        toastOk(`Synced — ${result?.matched_count ?? 0} existing record${result?.matched_count === 1 ? "" : "s"} found, next number ${result?.next_admission_no || ""}`);
+        await load();
+      } catch (err) {
+        mount(errorSlot, inlineAlert(humanError(err, "Those admission number settings could not be saved.")));
+      } finally {
+        setBusy(saveBtn, false);
+      }
+    });
+
+    return card("Admission numbers",
+      "Every new student is admitted with an admission number the database assigns automatically, so two registrars working at once never get handed the same number. Set the prefix and how many digits follow it here.",
+      h("div.form-grid.cols-2", {},
+        field({ label: "Prefix", id: "admPrefix", control: prefixInput, hint: "Letters, digits, / - _ only, e.g. \"PCP2026\" or \"PAS/2026/\"." }),
+        field({ label: "Digits (padding)", id: "admWidth", control: widthInput, hint: "Numbers longer than this are never truncated — the padding just decides the minimum width." })),
+      errorSlot,
+      h("div", { style: { margin: "12px 0" } }, previewBox),
+      inlineAlert("\"Save & sync from records\" re-aligns the next number with the highest one already in use — useful after typing numbers by hand or importing students.", "info"),
+      h("div.u-row", { style: { justifyContent: "flex-end", marginTop: "12px" } }, saveBtn));
+  }
+
+  /* ---------------- 7. report card ---------------- */
+  const SIGNATORY_ROLES = [
+    ["headmaster", "Headmaster", "headmaster_fallback_name", "headmaster_fallback_sig_url"],
+    ["principal", "Principal", "principal_fallback_name", "principal_fallback_sig_url"],
+    ["admin_officer", "Admin Officer", "admin_officer_fallback_name", "admin_officer_fallback_sig_url"],
+  ];
+
+  function signatoriesEditor(opts) {
+    const bySource = { staff: "an active staff member's own record", fallback: "the fallback typed here", school: "the school's saved name", none: "nothing set yet" };
+    const current = Object.fromEntries((state.data.signatories || []).map((r) => [r.role_key, r]));
+    const errorSlot = h("div");
+    const inputs = SIGNATORY_ROLES.map(([key, label, nameKey, urlKey]) => {
+      const nameInput = h("input.input", { value: opts[nameKey] || "", maxlength: "120", placeholder: `Fallback ${label.toLowerCase()} name` });
+      const urlInput = h("input.input", { type: "url", value: opts[urlKey] || "", placeholder: "https://…" });
+      const c = current[key];
+      const liveNote = c
+        ? h("p.u-xs.u-muted", { text: `Currently prints: ${c.full_name || "(no name set)"} — from ${bySource[c.source] || c.source}.` })
+        : null;
+      return { key, label, nameKey, urlKey, nameInput, urlInput,
+        node: h("div", { style: { padding: "10px 0", borderTop: "1px solid var(--ama-line)" } },
+          h("h4", { text: label, style: { margin: "0 0 6px" } }),
+          liveNote,
+          h("div.form-grid.cols-2", {},
+            field({ label: "Fallback name", id: `sig-${key}-name`, control: nameInput }),
+            field({ label: "Fallback signature address", id: `sig-${key}-url`, control: urlInput, hint: "https link to a scanned signature." })),
+        ) };
+    });
+
+    function validate() {
+      for (const i of inputs) {
+        const url = i.urlInput.value.trim();
+        if (url && !/^https:\/\//i.test(url)) return `The ${i.label} signature address must start with https://`;
+      }
+      return null;
+    }
+    function collect() {
+      const payload = {};
+      for (const i of inputs) {
+        payload[i.nameKey] = i.nameInput.value.trim() || null;
+        payload[i.urlKey] = i.urlInput.value.trim() || null;
+      }
+      return payload;
+    }
+
+    return { validate, payload: collect, node: h("div", { style: { marginTop: "18px", paddingTop: "14px", borderTop: "1px solid var(--ama-line)" } },
+      h("h3", { text: "Signatories" }),
+      h("p.u-xs.u-muted", { text: "Whoever actively holds Headmaster, Principal, or is marked \"Admin Officer\" in Staff signs automatically with their own name and signature. These fallbacks print only when nobody currently holds the position." }),
+      inputs.map((i) => i.node),
+    ) };
+  }
+
   function reportcard() {
     const d = state.data;
     const opts = { ...d.rc };
@@ -350,18 +461,27 @@ export default async function render({ outlet }) {
     const footer = h("input.input", { value: opts.footer_note || "", maxlength: "160" });
     const check = (key, label) => h("label.u-row", { style: { gap: "10px", cursor: "pointer" } },
       h("input", { type: "checkbox", checked: opts[key] !== false, style: { width: "20px", height: "20px" }, onchange: (e) => { opts[key] = e.target.checked; } }), label);
+    const signatories = signatoriesEditor(opts);
     const saveBtn = h("button.btn.btn-primary", { type: "button", text: "Save report card settings" });
+    const errorSlot = h("div");
 
-    saveBtn.addEventListener("click", () => run(saveBtn, "Report card saved", async () => {
-      unwrap(await supabase.from("schools").update({ report_card_template: picker.value }).eq("id", session.schoolId), "save template");
-      unwrap(await supabase.from("school_report_card_settings").update({
-        head_title: title.value.trim() || "TERM REPORT CARD", footer_note: footer.value.trim() || null,
-        show_photo: opts.show_photo !== false, show_attendance: opts.show_attendance !== false, show_positions: opts.show_positions !== false,
-      }).eq("school_id", session.schoolId), "save report card options");
-      // keep this session's copy current so the next preview uses it
-      if (context.school) context.school.report_card_template = picker.value;
-      if (session.school) session.school.report_card_template = picker.value;
-    }));
+    saveBtn.addEventListener("click", () => {
+      mount(errorSlot);
+      const problem = signatories.validate();
+      if (problem) return mount(errorSlot, inlineAlert(problem));
+      run(saveBtn, "Report card saved", async () => {
+        const signatoryPayload = signatories.payload();
+        unwrap(await supabase.from("schools").update({ report_card_template: picker.value }).eq("id", session.schoolId), "save template");
+        unwrap(await supabase.from("school_report_card_settings").update({
+          head_title: title.value.trim() || "TERM REPORT CARD", footer_note: footer.value.trim() || null,
+          show_photo: opts.show_photo !== false, show_attendance: opts.show_attendance !== false, show_positions: opts.show_positions !== false,
+          ...signatoryPayload,
+        }).eq("school_id", session.schoolId), "save report card options");
+        // keep this session's copy current so the next preview uses it
+        if (context.school) context.school.report_card_template = picker.value;
+        if (session.school) session.school.report_card_template = picker.value;
+      });
+    });
 
     return card("Report card",
       "Pick the design your school prints. Changing it never touches a stored result: existing results simply draw in the new design.",
@@ -374,6 +494,8 @@ export default async function render({ outlet }) {
           check("show_photo", "Show the student's photo"),
           check("show_attendance", "Show days present and absent"),
           check("show_positions", "Show subject and class positions"))),
+      signatories.node,
+      errorSlot,
       h("div.u-row", { style: { justifyContent: "flex-end", marginTop: "12px" } }, saveBtn));
   }
 }

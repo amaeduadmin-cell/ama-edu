@@ -8,7 +8,7 @@
    rather than only after an account is provisioned.
    =============================================================== */
 
-import { h, mount, skeleton, setBusy } from "../lib/dom.js";
+import { h, mount, skeleton, setBusy, safeUrl } from "../lib/dom.js";
 import { page, requireRole } from "./shell.js";
 import { supabase } from "../lib/supabase.js";
 import { unwrap, humanError, logError } from "../lib/errors.js";
@@ -52,7 +52,7 @@ export default async function render({ outlet }) {
     state.loading = true; draw();
     try {
       let q = supabase.from("staff")
-        .select("id, staff_code, full_name, email, phone, position, is_active, user_id, roles", { count: "exact" })
+        .select("id, staff_code, full_name, email, phone, position, signature_url, is_active, user_id, roles", { count: "exact" })
         .order("full_name");
       const term = state.search.trim();
       if (term) q = q.or(`full_name.ilike.%${term}%,staff_code.ilike.%${term}%`);
@@ -165,8 +165,19 @@ export default async function render({ outlet }) {
     const emailInput = h("input.input", { type: "email", value: existing?.email || "" });
     const phoneInput = h("input.input", { type: "tel", value: existing?.phone || "" });
     const posInput   = h("input.input", { value: existing?.position || "" });
+    const sigInput   = h("input.input", { type: "url", value: existing?.signature_url || "", placeholder: "https://…" });
+    const sigPreview = h("div.u-row", { style: { gap: "8px", alignItems: "center", marginTop: "6px" } });
     const errorSlot = h("div");
     const submit = h("button.btn.btn-primary", { type: "submit", form: "staffForm", text: isEdit ? "Save changes" : "Add staff" });
+
+    function paintSig() {
+      const url = safeUrl(sigInput.value.trim());
+      mount(sigPreview, url && /^https:/i.test(url)
+        ? h("img", { src: url, alt: "Signature preview", style: { height: "34px", maxWidth: "160px", objectFit: "contain", border: "1px solid var(--ama-line)", borderRadius: "4px", background: "#fff" } })
+        : sigInput.value.trim() ? h("span.u-xs", { style: { color: "var(--ama-danger)" }, text: "Must be an https:// link." }) : null);
+    }
+    sigInput.addEventListener("input", paintSig);
+    paintSig();
 
     const currentRoles = new Set(existing?.roles || []);
     const roleChecks = ROLES.map(([value, label]) => {
@@ -188,10 +199,14 @@ export default async function render({ outlet }) {
             full_name: nameInput.value.trim(), staff_code: codeInput.value.trim(),
             email: emailInput.value.trim() || null, phone: phoneInput.value.trim() || null,
             position: posInput.value.trim() || null,
+            signature_url: sigInput.value.trim() || null,
             roles: roleChecks.filter((r) => r.cb.checked).map((r) => r.value),
           };
           if (!payload.full_name) return mount(errorSlot, inlineAlert("Enter the staff member's full name."));
           if (!payload.staff_code) return mount(errorSlot, inlineAlert("Enter a Staff ID."));
+          if (payload.signature_url && !/^https:\/\//i.test(payload.signature_url)) {
+            return mount(errorSlot, inlineAlert("The signature address must start with https://"));
+          }
 
           setBusy(submit, true, "Saving…");
           try {
@@ -218,7 +233,9 @@ export default async function render({ outlet }) {
         errorSlot,
         h("div.form-grid.cols-2", {}, field({ label: "Full name", id: "stName", control: nameInput }), field({ label: "Staff ID", id: "stCode", control: codeInput })),
         h("div.form-grid.cols-2", {}, field({ label: "Email", id: "stEmail", control: emailInput }), field({ label: "Phone", id: "stPhone", control: phoneInput })),
-        field({ label: "Position", id: "stPos", control: posInput, hint: "Shown on certificates and letters, e.g. \"Mathematics Teacher\"." }),
+        field({ label: "Position", id: "stPos", control: posInput, hint: "Shown on certificates and letters, e.g. \"Mathematics Teacher\". Only an administrator can set this to \"Admin Officer\", since that title decides whose signature prints on report cards." }),
+        field({ label: "Signature image address", id: "stSig", control: sigInput, hint: "A link to a scanned or photographed signature (https). Printed on report cards when this person is Headmaster, Principal, or Admin Officer." }),
+        sigPreview,
         h("div.field", {}, h("label", { text: "Roles" }), h("div.u-stack", { style: { gap: "6px" } }, roleChecks.map((r) => r.node))),
         isEdit ? loginSection(existing) : loginHint(),
       ),

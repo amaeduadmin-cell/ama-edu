@@ -215,7 +215,14 @@ export default async function render({ outlet }) {
     };
 
     const nameInput  = h("input.input", { value: form.full_name, required: true });
-    const admInput   = h("input.input", { value: form.admission_no, required: true, placeholder: "Auto-suggested if left blank" });
+    // New admissions: the database assigns the number (register_student), so this
+    // field starts hidden behind a "use a custom number instead" toggle and a
+    // live preview. Editing an existing student still edits admission_no directly.
+    const admInput   = h("input.input", { value: form.admission_no, required: isEdit, placeholder: "e.g. ADM0001" });
+    const admStatus  = h("div.u-xs.u-muted");
+    const admPreview = h("div.u-xs.u-muted");
+    const customToggle = h("input", { type: "checkbox", checked: isEdit, style: { width: "18px", height: "18px" } });
+    const admFieldWrap = field({ label: "Admission number", id: "sfAdm", control: admInput });
     const classSel   = h("select.select", {}, state.classes.map((c) => h("option", { value: c.id, selected: c.id === form.class_id, text: c.name })));
     const genderSel  = h("select.select", {},
       h("option", { value: "", selected: !form.gender, text: "Not specified" }),
@@ -231,7 +238,55 @@ export default async function render({ outlet }) {
     const activeBox     = h("input", { type: "checkbox", checked: form.is_active, style: { width: "20px", height: "20px" } });
     const errorSlot = h("div");
 
-    if (!isEdit && !admInput.value) suggestAdmissionNumber(admInput);
+    let admCheckTimer;
+    let admissionPreview = null; // filled from admission_scheme_preview() for a fresh admission
+
+    function admissionField() {
+      const useCustom = isEdit || customToggle.checked;
+      admInput.disabled = !useCustom;
+      admInput.required = useCustom;
+      if (!useCustom) { admInput.value = ""; mount(admStatus); }
+      admFieldWrap.style.display = useCustom ? "" : "none";
+      mount(admPreview, useCustom ? null : (
+        admissionPreview
+          ? h("span", { text: `Next number: ${admissionPreview.next_admission_no}` })
+          : h("span", { text: "Loading the next number…" })
+      ));
+    }
+
+    function checkAdmissionLive() {
+      clearTimeout(admCheckTimer);
+      const value = admInput.value.trim();
+      mount(admStatus);
+      // Unchanged on an edit: nothing to check, it's already this student's own number.
+      if (isEdit && value === existing.admission_no) return;
+      if (!value) return;
+      admCheckTimer = setTimeout(async () => {
+        try {
+          const rows = unwrap(await supabase.rpc("check_admission_number", { p_value: value }), "check admission number");
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          if (row?.taken) {
+            mount(admStatus, h("span", { style: { color: "var(--ama-danger)" }, text: `Already belongs to ${row.full_name}${row.class_name ? ` (${row.class_name})` : ""}.` }));
+          } else {
+            mount(admStatus, h("span", { style: { color: "var(--ama-green-deep)" }, text: "Available." }));
+          }
+        } catch { /* best effort — the ordinary save still enforces uniqueness */ }
+      }, 350);
+    }
+
+    admInput.addEventListener("input", checkAdmissionLive);
+    customToggle.addEventListener("change", admissionField);
+
+    if (!isEdit) {
+      admissionField();
+      (async () => {
+        try {
+          const rows = unwrap(await supabase.rpc("admission_scheme_preview"), "admission preview");
+          admissionPreview = Array.isArray(rows) ? rows[0] : rows;
+        } catch { admissionPreview = { next_admission_no: "—" }; }
+        admissionField();
+      })();
+    }
 
     const submit = h("button.btn.btn-primary", { type: "submit", text: isEdit ? "Save changes" : "Admit student" });
 
@@ -243,9 +298,9 @@ export default async function render({ outlet }) {
         onsubmit: async (e) => {
           e.preventDefault();
           mount(errorSlot);
+          const useCustomAdm = isEdit || customToggle.checked;
           const payload = {
             full_name: nameInput.value.trim(),
-            admission_no: admInput.value.trim(),
             class_id: classSel.value,
             gender: genderSel.value || null,
             guardian_name: gName.value.trim() || null,
@@ -257,6 +312,8 @@ export default async function render({ outlet }) {
             photo_url: photoInput.value.trim() || null,
             is_active: activeBox.checked,
           };
+          if (useCustomAdm) payload.admission_no = admInput.value.trim();
+
           if (payload.photo_url && !/^https:\/\//i.test(payload.photo_url)) {
             return mount(errorSlot, inlineAlert("The photo address must start with https://"));
           }
@@ -264,7 +321,7 @@ export default async function render({ outlet }) {
             return mount(errorSlot, inlineAlert("The date of birth cannot be in the future."));
           }
           if (!payload.full_name) return mount(errorSlot, inlineAlert("Enter the student's full name."));
-          if (!payload.admission_no) return mount(errorSlot, inlineAlert("Enter an admission number."));
+          if (useCustomAdm && !payload.admission_no) return mount(errorSlot, inlineAlert("Enter an admission number, or switch off the custom number to let the school assign the next one."));
           if (!payload.class_id) return mount(errorSlot, inlineAlert("Choose a class."));
 
           setBusy(submit, true, isEdit ? "Saving…" : "Admitting…");
@@ -272,11 +329,25 @@ export default async function render({ outlet }) {
             if (isEdit) {
               unwrap(await supabase.from("students").update(payload).eq("id", existing.id), "update student");
               toastOk("Student updated");
-            } else {
+            } else if (useCustomAdm) {
+              // A number typed by hand: the ordinary insert is the final backstop —
+              // the (school_id, admission_no) unique constraint still enforces this.
               // school_id is also defaulted by the database (migration 0018); sending it
               // means a change to that default cannot silently bring the old bug back.
               unwrap(await supabase.from("students").insert({ ...payload, school_id: session.schoolId }), "insert student");
               toastOk("Student admitted");
+            } else {
+              // Auto-assigned: the database locks the school row and hands back the
+              // number it picked, so two registrars submitting at once never collide.
+              const rows = unwrap(await supabase.rpc("register_student", {
+                p_full_name: payload.full_name, p_class_id: payload.class_id,
+                p_gender: payload.gender, p_dob: payload.date_of_birth,
+              }), "register student");
+              const row = Array.isArray(rows) ? rows[0] : rows;
+              // register_student only sets name/class/gender/dob; save the rest now.
+              const { full_name, class_id, gender, date_of_birth, ...rest } = payload;
+              unwrap(await supabase.from("students").update(rest).eq("id", row.id), "save student details");
+              toastOk(`Student admitted — admission number ${row.admission_no}`);
             }
             close();
             await load();
@@ -290,8 +361,13 @@ export default async function render({ outlet }) {
         errorSlot,
         h("div.form-grid.cols-2", {},
           field({ label: "Full name", id: "sfName", control: nameInput }),
-          field({ label: "Admission number", id: "sfAdm", control: admInput }),
+          h("div", {}, admFieldWrap, admStatus),
         ),
+        !isEdit ? h("div.u-stack", { style: { gap: "4px", margin: "-8px 0 10px" } },
+          h("label.u-row", { style: { gap: "8px", cursor: "pointer" } }, customToggle,
+            h("span.u-xs", { text: "Use a custom admission number instead of the next available one" })),
+          admPreview,
+        ) : null,
         h("div.form-grid.cols-2", {},
           field({ label: "Class", id: "sfClass", control: classSel }),
           field({ label: "Gender", id: "sfGender", control: genderSel }),
@@ -350,10 +426,4 @@ export default async function render({ outlet }) {
     );
   }
 
-  async function suggestAdmissionNumber(input) {
-    try {
-      const { data } = await supabase.from("schools").select("admission_prefix, admission_next_no").eq("id", session.schoolId).single();
-      if (data) input.placeholder = `${data.admission_prefix}${String(data.admission_next_no).padStart(4, "0")}`;
-    } catch { /* best effort */ }
-  }
 }

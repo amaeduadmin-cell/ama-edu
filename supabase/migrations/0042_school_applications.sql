@@ -45,6 +45,8 @@ create table public.school_applications (
   website       text check (website is null or (website ~ '^https?://[^[:space:]]+$' and length(website) <= 300)),
   declared_student_count integer check (declared_student_count is null or declared_student_count between 0 and 200000),
   registration_number text check (length(registration_number) <= 80),
+  report_card_template text not null default 'classic'
+                  references public.report_card_templates(code) on update cascade,
 
   -- the person who will administer it
   admin_full_name text not null check (length(btrim(admin_full_name)) between 2 and 120),
@@ -118,6 +120,7 @@ declare
   v_sections text[];
   v_declared integer;
   v_website  text;
+  v_template text;
   v_existing public.school_applications%rowtype;
   v_ref      text;
   v_try      integer := 0;
@@ -167,6 +170,13 @@ begin
   v_declared := case when (v->>'declared_student_count') ~ '^[0-9]{1,6}$'
                      then (v->>'declared_student_count')::integer end;
 
+  -- an unknown or retired report card falls back to Template 1, exactly as the old registration did
+  v_template := 'classic';
+  if exists (select 1 from public.report_card_templates t
+              where t.code = btrim(coalesce(v->>'report_card_template', '')) and t.is_active) then
+    v_template := btrim(v->>'report_card_template');
+  end if;
+
   -- retrying the same application (dropped connection, double tap) is safe: hand back the same reference
   select * into v_existing from public.school_applications a
    where a.requested_slug = v_slug and lower(a.admin_email) = v_aemail and a.status = 'pending';
@@ -191,13 +201,15 @@ begin
     begin
       insert into public.school_applications as a (
         school_name, requested_slug, school_type, sections, school_email, school_phone, address, website,
-        declared_student_count, registration_number, admin_full_name, admin_email, admin_phone, message)
+        declared_student_count, registration_number, report_card_template,
+        admin_full_name, admin_email, admin_phone, message)
       values (
         v_name, v_slug, v_type::app.school_type, v_sections, v_semail,
         nullif(btrim(coalesce(v->>'school_phone', '')), ''),
         nullif(btrim(coalesce(v->>'address', '')), ''),
         v_website, v_declared,
         nullif(btrim(coalesce(v->>'registration_number', '')), ''),
+        v_template,
         v_aname, v_aemail,
         nullif(btrim(coalesce(v->>'admin_phone', '')), ''),
         nullif(btrim(coalesce(v->>'message', '')), ''))
@@ -339,9 +351,10 @@ begin
     raise exception 'A school with that web address already exists.' using errcode = '23505';
   end if;
 
-  insert into public.schools as s (name, slug, school_type, status, email, phone, address, website, declared_student_count)
+  insert into public.schools as s (name, slug, school_type, status, email, phone, address, website,
+                                   declared_student_count, report_card_template)
   values (a.school_name, a.requested_slug, a.school_type, 'active', a.school_email, a.school_phone, a.address,
-          a.website, a.declared_student_count)
+          a.website, a.declared_student_count, a.report_card_template)
   returning s.id into v_school;
 
   perform public.bootstrap_new_school(v_school, a.sections);

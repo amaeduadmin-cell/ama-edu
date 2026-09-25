@@ -29,7 +29,7 @@ import { sendEmail, escapeHtml } from "./_shared/email.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-ama-client",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -76,11 +76,10 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => null);
     const kind = body?.kind;
     const rowId = String(body?.table_id ?? "");
-    const password = String(body?.password ?? "");
+    const typedPassword = String(body?.password ?? "").trim();
 
     if (kind !== "staff" && kind !== "student") return json({ error: "Unknown account type." }, 400);
     if (!rowId) return json({ error: "Missing record id." }, 400);
-    if (password.length < 6) return json({ error: "Choose a password of at least 6 characters." }, 400);
 
     if (kind === "staff" && !isAdmin) {
       return json({ error: "Only a school administrator can create or reset staff logins." }, 403);
@@ -88,6 +87,9 @@ Deno.serve(async (req: Request) => {
     if (kind === "student" && !isAdmin && !isRegistrar) {
       return json({ error: "You do not have permission to create student logins." }, 403);
     }
+
+    let password = typedPassword;
+    let usedDefault = false;
 
     const table = kind === "staff" ? "staff" : "students";
     const idColumn = kind === "staff" ? "staff_code" : "admission_no";
@@ -112,6 +114,25 @@ Deno.serve(async (req: Request) => {
       return json({
         error: "Give this person at least one role and save the record before creating a login.",
         stage: "roles",
+      }, 400);
+    }
+
+    // Resolved against the RECORD's own school (row.school_id), not the caller's — a platform
+    // admin acting on another school must get that school's default, never their own.
+    stage = "resolving the password";
+    if (!password) {
+      const defaultColumn = kind === "staff" ? "staff_default_password" : "student_default_password";
+      const { data: schoolRow, error: schoolErr } = await admin
+        .from("schools").select(defaultColumn).eq("id", row.school_id).single();
+      if (schoolErr) throw schoolErr;
+      password = String((schoolRow as Record<string, unknown> | null)?.[defaultColumn] ?? "");
+      usedDefault = password.length > 0;
+    }
+    if (password.length < 6) {
+      return json({
+        error: typedPassword
+          ? "Choose a password of at least 6 characters."
+          : `No password was typed, and this school has no default ${kind === "staff" ? "staff" : "student"} password set yet. Type one here, or set a default in Academic settings.`,
       }, 400);
     }
 
@@ -181,7 +202,7 @@ Deno.serve(async (req: Request) => {
       action: isNewLogin ? "login.provisioned" : "login.password_reset",
       entity: table,
       entity_id: rowId,
-      detail: { kind, identifier },
+      detail: { kind, identifier, used_default: usedDefault },
     });
 
     if (isNewLogin && notifyEmail && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(notifyEmail)) {
@@ -204,7 +225,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return json({ ok: true, user_id: userId, login_id: identifier, created: isNewLogin });
+    return json({ ok: true, user_id: userId, login_id: identifier, created: isNewLogin, used_default: usedDefault });
   } catch (err) {
     // The technical detail goes to the function logs; the person gets the
     // step that failed and what is safe to do next.

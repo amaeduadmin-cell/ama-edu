@@ -27,7 +27,7 @@ import { templatePicker } from "../lib/template-picker.js";
 const TABS = [
   ["sections", "School sections"], ["assessment", "Assessment system"], ["grading", "Grading"],
   ["remarks", "Grade remarks"], ["results", "Results & fees"],
-  ["admission", "Admission numbers"], ["reportcard", "Report card"],
+  ["admission", "IDs & passwords"], ["reportcard", "Report card"],
 ];
 
 const SECTIONS = [
@@ -74,8 +74,8 @@ export default async function render({ outlet }) {
 
   async function load() {
     try {
-      const [schoolRows, sections, components, bands, remarks, rcRows, counts, admissionPreview, signatories] = await Promise.all([
-        unwrap(await supabase.from("schools").select("id, name, motto, address, phone, logo_url, report_card_template, result_fee_policy, teachers_may_publish, declared_student_count, admission_prefix, admission_pad_width, admission_next_no").eq("id", session.schoolId).limit(1), "school"),
+      const [schoolRows, sections, components, bands, remarks, rcRows, counts, admissionPreview, staffCodePreview, signatories] = await Promise.all([
+        unwrap(await supabase.from("schools").select("id, name, motto, address, phone, logo_url, report_card_template, result_fee_policy, teachers_may_publish, declared_student_count, admission_prefix, admission_pad_width, admission_next_no, staff_code_prefix, staff_code_pad_width, staff_code_next_number").eq("id", session.schoolId).limit(1), "school"),
         unwrap(await supabase.from("school_sections").select("section, is_enabled"), "sections"),
         unwrap(await supabase.from("assessment_components").select("code, label, max_score, is_active, sort_order").order("sort_order"), "components"),
         unwrap(await supabase.from("grading_bands").select("grade, min_score, max_score, remark, is_pass, sort_order").order("min_score"), "bands"),
@@ -83,6 +83,7 @@ export default async function render({ outlet }) {
         unwrap(await supabase.from("school_report_card_settings").select("*").eq("school_id", session.schoolId).limit(1), "rc settings"),
         unwrap(await supabase.rpc("school_billing_counts", { p_school_id: session.schoolId }), "counts"),
         unwrap(await supabase.rpc("admission_scheme_preview"), "admission preview"),
+        unwrap(await supabase.rpc("staff_code_scheme_preview"), "staff ID preview"),
         unwrap(await supabase.rpc("report_card_signatories"), "signatories"),
       ]);
       state.data = {
@@ -90,6 +91,7 @@ export default async function render({ outlet }) {
         rc: rcRows?.[0] || { head_title: "TERM REPORT CARD", show_photo: true, show_attendance: true, show_positions: true },
         counts: Array.isArray(counts) ? counts[0] : counts,
         admission: Array.isArray(admissionPreview) ? admissionPreview[0] : admissionPreview,
+        staffCode: Array.isArray(staffCodePreview) ? staffCodePreview[0] : staffCodePreview,
         signatories: signatories || [],
       };
       draw();
@@ -348,6 +350,11 @@ export default async function render({ outlet }) {
 
   /* ---------------- 6. admission numbers ---------------- */
   function admission() {
+    return h("div.u-stack", { style: { gap: "20px" } },
+      admissionNumbersCard(), staffIdsCard(), defaultPasswordsCard());
+  }
+
+  function admissionNumbersCard() {
     const s = state.data.school;
     const a = state.data.admission || {};
     const prefixInput = h("input.input", { value: s.admission_prefix || "", maxlength: "20", style: { maxWidth: "160px" }, placeholder: "e.g. ADM" });
@@ -399,6 +406,104 @@ export default async function render({ outlet }) {
       errorSlot,
       h("div", { style: { margin: "12px 0" } }, previewBox),
       inlineAlert("\"Save & sync from records\" re-aligns the next number with the highest one already in use — useful after typing numbers by hand or importing students.", "info"),
+      h("div.u-row", { style: { justifyContent: "flex-end", marginTop: "12px" } }, saveBtn));
+  }
+
+  function staffIdsCard() {
+    const s = state.data.school;
+    const p = state.data.staffCode || {};
+    const prefixInput = h("input.input", { value: s.staff_code_prefix || "", maxlength: "20", style: { maxWidth: "160px" }, placeholder: "e.g. ST" });
+    const widthInput = h("input.input.u-num", { type: "number", min: "1", max: "8", step: "1", value: s.staff_code_pad_width ?? 4, style: { maxWidth: "100px" } });
+    const previewBox = h("div.u-row", { style: { gap: "24px", flexWrap: "wrap" } });
+    const saveBtn = h("button.btn.btn-primary", { type: "button", text: "Save & sync from records" });
+    const errorSlot = h("div");
+
+    function paintPreview(preview) {
+      mount(previewBox,
+        stat("Next Staff ID", preview?.next_staff_code || "—"),
+        stat("Last issued", preview?.last_issued || "—"),
+        stat("Active staff", preview?.total_active_staff ?? 0),
+      );
+    }
+    paintPreview(p);
+
+    saveBtn.addEventListener("click", async () => {
+      mount(errorSlot);
+      const prefix = prefixInput.value.trim();
+      const width = Number(widthInput.value);
+      if (!/^[A-Za-z0-9/_-]{1,20}$/.test(prefix)) {
+        return mount(errorSlot, inlineAlert("Prefix may only contain letters, digits, / - _ (1 to 20 characters)."));
+      }
+      if (!(width >= 1 && width <= 8)) {
+        return mount(errorSlot, inlineAlert("Digits (padding) must be between 1 and 8."));
+      }
+      setBusy(saveBtn, true, "Syncing…");
+      try {
+        if (width !== s.staff_code_pad_width) {
+          unwrap(await supabase.from("schools").update({ staff_code_pad_width: width }).eq("id", session.schoolId), "save pad width");
+        }
+        const rows = unwrap(await supabase.rpc("sync_staff_code_scheme", { p_prefix: prefix }), "sync staff ID scheme");
+        const result = Array.isArray(rows) ? rows[0] : rows;
+        toastOk(`Synced — ${result?.matched_count ?? 0} existing record${result?.matched_count === 1 ? "" : "s"} found, next ID ${result?.next_staff_code || ""}`);
+        await load();
+      } catch (err) {
+        mount(errorSlot, inlineAlert(humanError(err, "Those Staff ID settings could not be saved.")));
+      } finally {
+        setBusy(saveBtn, false);
+      }
+    });
+
+    return card("Staff IDs",
+      "Adding a staff member suggests the next Staff ID automatically, the same way admission numbers work — the suggestion can still be typed over by hand.",
+      h("div.form-grid.cols-2", {},
+        field({ label: "Prefix", id: "stcPrefix", control: prefixInput, hint: "Letters, digits, / - _ only, e.g. \"ST\" or \"TCH\"." }),
+        field({ label: "Digits (padding)", id: "stcWidth", control: widthInput })),
+      errorSlot,
+      h("div", { style: { margin: "12px 0" } }, previewBox),
+      inlineAlert("A cancelled \"Add staff\" dialog can leave a small gap in the sequence — press \"Save & sync from records\" any time to close it.", "info"),
+      h("div.u-row", { style: { justifyContent: "flex-end", marginTop: "12px" } }, saveBtn));
+  }
+
+  function defaultPasswordsCard() {
+    // Deliberately never pre-filled from a fetched value — see the note at
+    // the top of migration 0042: a default password is set here and never
+    // read back into any screen afterward.
+    const studentPw = h("input.input", { type: "password", minlength: "6", placeholder: "Not shown once saved", autocomplete: "new-password" });
+    const staffPw = h("input.input", { type: "password", minlength: "6", placeholder: "Not shown once saved", autocomplete: "new-password" });
+    const errorSlot = h("div");
+    const saveBtn = h("button.btn.btn-primary", { type: "button", text: "Save defaults" });
+
+    saveBtn.addEventListener("click", async () => {
+      mount(errorSlot);
+      const payload = {};
+      if (studentPw.value) {
+        if (studentPw.value.length < 6) return mount(errorSlot, inlineAlert("The student default password must be at least 6 characters."));
+        payload.student_default_password = studentPw.value;
+      }
+      if (staffPw.value) {
+        if (staffPw.value.length < 6) return mount(errorSlot, inlineAlert("The staff default password must be at least 6 characters."));
+        payload.staff_default_password = staffPw.value;
+      }
+      if (!Object.keys(payload).length) return mount(errorSlot, inlineAlert("Type at least one password to save."));
+
+      setBusy(saveBtn, true, "Saving…");
+      try {
+        unwrap(await supabase.from("schools").update(payload).eq("id", session.schoolId), "save default passwords");
+        toastOk("Default password saved");
+        studentPw.value = ""; staffPw.value = "";
+      } catch (err) {
+        mount(errorSlot, inlineAlert(humanError(err, "Those default passwords could not be saved.")));
+      } finally {
+        setBusy(saveBtn, false);
+      }
+    });
+
+    return card("Default passwords",
+      "Used automatically whenever \"Create login\" or a password reset is submitted with the password field left blank — for one person at a time on the Staff and Students pages, and for the bulk reset panels there. Leave a box blank to leave that default unchanged.",
+      h("div.form-grid.cols-2", {},
+        field({ label: "Student default password", id: "defStudentPw", control: studentPw }),
+        field({ label: "Staff default password", id: "defStaffPw", control: staffPw })),
+      errorSlot,
       h("div.u-row", { style: { justifyContent: "flex-end", marginTop: "12px" } }, saveBtn));
   }
 

@@ -25,10 +25,14 @@ export default async function render({ outlet }) {
   const canWrite = hasRole("admin", "registrar_primary", "registrar_secondary");
 
   const body = h("div.u-stack");
+  const isAdmin = hasRole("admin");
   mount(outlet, page({
     title: "Students",
     subtitle: canWrite ? "Admit, edit and manage student records for your school." : "Your school's student roster.",
-    actions: canWrite ? [h("button.btn.btn-primary", { type: "button", text: "Admit student", onclick: () => openStudentForm() })] : [],
+    actions: canWrite ? [
+      isAdmin ? h("button.btn.btn-outline", { type: "button", text: "Bulk credential reset", onclick: () => openBulkResetModal() }) : null,
+      h("button.btn.btn-primary", { type: "button", text: "Admit student", onclick: () => openStudentForm() }),
+    ] : [],
     body,
   }));
 
@@ -399,17 +403,35 @@ export default async function render({ outlet }) {
   }
 
   function loginSection(student) {
-    const pw = h("input.input", { type: "password", minlength: "6", placeholder: "New password", autocomplete: "new-password" });
-    const btn = h("button.btn.btn-outline.btn-sm", { type: "button", text: student.user_id ? "Reset password" : "Create login" });
+    const isReset = Boolean(student.user_id);
+    const pw = h("input.input", { type: "password", minlength: "6", placeholder: "Leave blank to use the school default", autocomplete: "new-password" });
+    const btn = h("button.btn.btn-outline.btn-sm", { type: "button", text: isReset ? "Reset password" : "Create login" });
     const note = h("div.u-xs.u-muted");
+    const hint = h("p.u-xs", { style: { color: "var(--ama-amber-deep, #92610a)" } });
+
+    function paintHint() {
+      mount(hint, pw.value
+        ? null
+        : h("span", { text: isReset
+            ? "Left blank, this resets their password to the current school default."
+            : "Left blank, the login is created with the current school default password." }));
+    }
+    pw.addEventListener("input", paintHint);
+    paintHint();
 
     btn.addEventListener("click", async () => {
-      if (pw.value.length < 6) return mount(note, inlineAlert("Enter a password of at least 6 characters."));
+      mount(note);
+      if (pw.value && pw.value.length < 6) {
+        return mount(note, inlineAlert("Enter a password of at least 6 characters, or leave it blank to use the school default."));
+      }
       setBusy(btn, true, "Working…");
       try {
-        await invokeFunction("provision-user", { kind: "student", table_id: student.id, password: pw.value });
-        toastOk(student.user_id ? "Password reset" : "Login is ready");
+        const res = await invokeFunction("provision-user", { kind: "student", table_id: student.id, password: pw.value });
+        toastOk(res?.used_default
+          ? (isReset ? "Password reset to the school default" : "Login created with the school default password")
+          : (isReset ? "Password reset" : "Login is ready"));
         pw.value = "";
+        paintHint();
         await load();
       } catch (err) {
         mount(note, inlineAlert(humanError(err, "Could not set up the login.")));
@@ -422,8 +444,117 @@ export default async function render({ outlet }) {
       h("h3", { text: "Sign-in", style: { marginBottom: "8px" } }),
       h("p.u-xs.u-muted", { text: `Admission number ${student.admission_no} is the sign-in ID. Set or reset the password below.` }),
       h("div.u-row", {}, pw, btn),
+      hint,
       note,
     );
+  }
+
+  /* ---------------- Bulk credential reset (admin only) ---------------- */
+
+  function showMappingModal(title, mapping, oldKey, newKey) {
+    const rows = mapping || [];
+    const copyBtn = h("button.btn.btn-outline.btn-sm", { type: "button", text: "Copy as text" });
+    copyBtn.addEventListener("click", async () => {
+      const text = ["Name\tOld\tNew", ...rows.map((r) => `${r.full_name}\t${r[oldKey]}\t${r[newKey]}`)].join("\n");
+      try {
+        await navigator.clipboard.writeText(text);
+        toastOk("Copied — paste into a spreadsheet or document to print and distribute.");
+      } catch {
+        toastError("Could not copy automatically. Select the list below and copy it by hand.");
+      }
+    });
+    const close2 = openModal({
+      title, wide: true,
+      body: h("div.u-stack", { style: { gap: "10px" } },
+        h("p.u-xs.u-muted", { text: "Give each person their new ID. This list is not shown again, so copy or print it now." }),
+        copyBtn,
+        h("div.table-wrap", { style: { maxHeight: "360px", overflow: "auto" } },
+          h("table.table", {},
+            h("thead", {}, h("tr", {}, h("th", { text: "Name" }), h("th", { text: "Old" }), h("th", { text: "New" }))),
+            h("tbody", {}, rows.map((r) => h("tr", {},
+              h("td", { text: r.full_name }), h("td", { text: r[oldKey] }), h("td", { text: r[newKey] })))),
+          )),
+      ),
+      actions: [h("button.btn.btn-primary", { type: "button", text: "Done", onclick: () => close2() })],
+    });
+  }
+
+  function openBulkResetModal() {
+    const pwReset = h("input.input", { type: "password", minlength: "6", placeholder: "New default password", autocomplete: "new-password" });
+    const resetNote = h("div");
+    const resetBtn = h("button.btn.btn-danger.btn-sm", { type: "button", text: "Reset all student passwords" });
+
+    const prefixInput = h("input.input", { placeholder: "e.g. PCP2026/", style: { maxWidth: "180px" } });
+    const pwRenumber = h("input.input", { type: "password", minlength: "6", placeholder: "New default password", autocomplete: "new-password" });
+    const renumberNote = h("div");
+    const renumberBtn = h("button.btn.btn-danger.btn-sm", { type: "button", text: "Renumber & reset passwords" });
+
+    resetBtn.addEventListener("click", async () => {
+      mount(resetNote);
+      if (pwReset.value.length < 6) return mount(resetNote, inlineAlert("Enter a new default password of at least 6 characters."));
+      const ok = await confirmAction({
+        title: "Reset every student's password?",
+        message: "This immediately changes the sign-in password for every active student who already has a login, and becomes the new default for students admitted from now on. This cannot be undone.",
+        confirmLabel: "Reset all passwords", danger: true,
+      });
+      if (!ok) return;
+      setBusy(resetBtn, true, "Resetting…");
+      try {
+        const res = await invokeFunction("bulk-credential-reset", { action: "reset_student_passwords", new_default_password: pwReset.value });
+        toastOk(`Reset ${res.reset} of ${res.total} student login${res.total === 1 ? "" : "s"}${res.skippedNoLogin ? ` (${res.skippedNoLogin} have no login yet)` : ""}.`);
+        pwReset.value = "";
+        close();
+      } catch (err) {
+        mount(resetNote, inlineAlert(humanError(err, "Could not reset student passwords.")));
+      } finally {
+        setBusy(resetBtn, false);
+      }
+    });
+
+    renumberBtn.addEventListener("click", async () => {
+      mount(renumberNote);
+      const prefix = prefixInput.value.trim();
+      if (!prefix) return mount(renumberNote, inlineAlert("Enter a prefix for the new admission numbers."));
+      if (pwRenumber.value.length < 6) return mount(renumberNote, inlineAlert("Enter a new default password of at least 6 characters."));
+      const ok = await confirmAction({
+        title: "Renumber every active student?",
+        message: `Every active student gets a brand-new admission number starting from ${prefix}0001, and their password is reset to the value below. This cannot be undone — you'll get a list to print or distribute afterward.`,
+        confirmLabel: "Renumber & reset", danger: true,
+      });
+      if (!ok) return;
+      setBusy(renumberBtn, true, "Renumbering…");
+      try {
+        const res = await invokeFunction("bulk-credential-reset", { action: "renumber_students", prefix, new_default_password: pwRenumber.value });
+        toastOk(`Renumbered ${res.count} student${res.count === 1 ? "" : "s"}.`);
+        close();
+        showMappingModal("Students renumbered", res.mapping, "old_admission_no", "new_admission_no");
+        await load();
+      } catch (err) {
+        mount(renumberNote, inlineAlert(humanError(err, "Could not renumber students.")));
+      } finally {
+        setBusy(renumberBtn, false);
+      }
+    });
+
+    const close = openModal({
+      title: "Bulk credential reset",
+      wide: true,
+      body: h("div.u-stack", { style: { gap: "20px" } },
+        h("div", {},
+          h("h3", { text: "Reset all student passwords" }),
+          h("p.u-xs.u-muted", { text: "Sets every active student's login password to the value below, and saves it as the new default for students admitted from now on." }),
+          h("div.u-row", {}, pwReset, resetBtn),
+          resetNote,
+        ),
+        h("div", { style: { paddingTop: "16px", borderTop: "1px solid var(--ama-line)" } },
+          h("h3", { text: "Renumber & reset (new admission scheme)" }),
+          h("p.u-xs.u-muted", { text: "Replaces every active student's admission number with a fresh sequential number under a new prefix, and resets their password. Use this to move a whole cohort off an old or ad-hoc numbering scheme." }),
+          h("div.u-row", {}, prefixInput, pwRenumber, renumberBtn),
+          renumberNote,
+        ),
+      ),
+      actions: [h("button.btn.btn-outline", { type: "button", text: "Close", onclick: () => close() })],
+    });
   }
 
 }

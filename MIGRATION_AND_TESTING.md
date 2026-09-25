@@ -58,3 +58,13 @@ The live project currently has 5 schools, 5 active terms, 69 active classes, 9 a
 The repository now includes `supabase/seed/001_unlock_workflow_teacher_assignment.sql`. It selects an existing active teacher, an existing active class with at least one active student, and an existing active subject from the same school, then inserts only the missing `class_teacher_subjects` assignment. It does not create accounts or student records. Review the returned row before keeping the transaction committed; change the final `commit;` to `rollback;` if the selected fixture is not appropriate.
 
 After committing the seed, sign in as the selected teacher and administrator and run the workflow steps above. The current live data has aligned teacher/class/subject/student candidates in two schools, so this seed provides a valid starting point without inventing identity data.
+
+## Section-specific fees
+
+Administrators can configure independent default amounts for **Nursery, Primary, Junior Secondary (JSS), Senior Secondary (SS), and Islamiyya** under **Settings → Section fee schedule** for the active term. A class-specific amount entered from **Fees** overrides its section default. The database helper uses the same precedence for fee status and report-card fee checks.
+
+## School application to live portal
+
+Public registration now submits an application and does not create a tenant or store a password. Platform administrators open **Admin → Applications**, review the applicant list, approve or reject each application, and record a decision note when needed. To make an approved application live, create a Supabase Auth user using the applicant administrator email, then enter that Auth user UUID in the application card and select **Provision live portal**. The server-side provisioning function atomically creates the school, its selected academic sections and defaults, the administrator staff record, and the tenant membership.
+
+The application migration `0042_school_applications.sql` and section-fee migration `0045_section_fees_and_portal_approval.sql` have been applied to the connected AMA EDU Supabase project. The live application queue is currently empty, and both feature tables plus the section fee helper have been verified.

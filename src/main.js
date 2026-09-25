@@ -95,6 +95,7 @@ function registerPlatformRoutes() {
   register("/reset-password",   () => import("./pages/reset-password.js"));
   register("/admin",            () => import("./app/platform/console.js"), { requires: "platform" });
   register("/admin/schools",    () => import("./app/platform/schools.js"), { requires: "platform" });
+  register("/admin/applications", () => import("./app/platform/applications.js"), { requires: "platform" });
   register("/admin/schools/:id",() => import("./app/platform/school-detail.js"), { requires: "platform" });
   register("/admin/content",    () => import("./app/platform/content.js"), { requires: "platform" });
   setNotFound(() => import("./pages/not-found.js"));

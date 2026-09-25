@@ -32,10 +32,15 @@ export default async function render({ outlet }) {
         unwrap(await supabase.from("schools").select("*").eq("id", session.schoolId).single(), "fetch school"),
         unwrap(await supabase.from("terms").select("id, label, order_index, is_active, ends_on, next_term_starts_on, sessions(label)").order("order_index"), "fetch terms"),
       ]);
+      const activeTerm = terms.find((term) => term.is_active) || terms[0];
+      const sectionFees = activeTerm
+        ? unwrap(await supabase.from("school_section_fees").select("id, section, amount").eq("term_id", activeTerm.id), "fetch section fees")
+        : [];
       mount(body,
         generalCard(school),
         brandingCard(school),
         academicCard(terms),
+        sectionFeesCard(activeTerm, sectionFees),
         admissionCard(school),
         passwordCard(),
       );
@@ -46,6 +51,38 @@ export default async function render({ outlet }) {
   } else {
     mount(body, passwordCard());
   }
+}
+
+function sectionFeesCard(term, rows) {
+  if (!term) return null;
+  const sections = [["nursery", "Nursery"], ["primary", "Primary"], ["jss", "Junior Secondary (JSS)"], ["ss", "Senior Secondary (SS)"], ["islamiyya", "Islamiyya"]];
+  const values = new Map(rows.map((row) => [row.section, row.amount]));
+  const controls = new Map();
+  const note = h("div");
+  const save = h("button.btn.btn-primary", { type: "button", text: "Save section fees" });
+  save.addEventListener("click", async () => {
+    const payload = [];
+    for (const [section] of sections) {
+      const amount = Number(controls.get(section).value);
+      if (!Number.isFinite(amount) || amount < 0) return mount(note, inlineAlert("Enter a valid amount for every section, or use 0 for a free section."));
+      payload.push({ school_id: session.schoolId, term_id: term.id, section, amount, updated_by: session.staffId || null });
+    }
+    setBusy(save, true, "Saving…");
+    try {
+      unwrap(await supabase.from("school_section_fees").upsert(payload, { onConflict: "school_id,term_id,section" }), "save section fees");
+      toastOk("Section fees saved");
+    } catch (err) { mount(note, inlineAlert(humanError(err))); } finally { setBusy(save, false); }
+  });
+  return h("section.card", {},
+    h("div.card-head", {}, h("div", {}, h("h2.card-title", { text: "Section fee schedule" }), h("div.card-sub", { text: `${term.label} Term · These are defaults; a class-specific fee can override them on Fees.` })), h("span.badge.badge-info", { text: "NGN" })),
+    h("div.form-grid.cols-2", {}, sections.map(([section, label]) => {
+      const input = h("input.input.u-num", { type: "number", min: "0", step: "100", value: values.get(section) ?? "", placeholder: "e.g. 25000" });
+      controls.set(section, input);
+      return field({ label, id: `section-fee-${section}`, control: input });
+    })),
+    h("p.u-xs.u-muted", { text: "Fee calculations use the class-specific amount first, then this section default. Nursery, Primary, JSS, SS, and Islamiyya are intentionally independent." }),
+    note, save,
+  );
 }
 
 /* ---------------- General ---------------- */

@@ -3,11 +3,10 @@
 
 import "../styles/marketing.css";
 import { h, mount, setBusy } from "../lib/dom.js";
-import { field, passwordField, inlineAlert, toastError } from "../lib/ui.js";
+import { field, inlineAlert, toastError } from "../lib/ui.js";
 import { toSlug, validateSlug, tenantUrl, ROOT } from "../lib/tenant.js";
 import { supabase } from "../lib/supabase.js";
 import { humanError, logError } from "../lib/errors.js";
-import { invokeFunction } from "../lib/functions.js";
 import { templatePicker } from "../lib/template-picker.js";
 
 const SCHOOL_TYPES = [
@@ -62,8 +61,8 @@ export default function render({ outlet }) {
         h("div.steps", { "aria-hidden": "true" },
           [0, 1, 2, 3].map(i => h(`div.step${i <= step ? ".done" : ""}`))),
         h("div.panel-head", {},
-          h("h1.panel-title", { text: ["Tell us about the school", "Sections and report card", "Choose your web address", "Create the administrator account"][step] }),
-          h("p.panel-sub", { text: ["This appears on report cards, certificates and the portal itself.", "Tell us which sections you run, so your portal only shows what applies to you.", "This is the address your staff, students and parents will use.", "This account can do everything inside your school portal."][step] }),
+          h("h1.panel-title", { text: ["Tell us about the school", "Sections and report card", "Choose your web address", "Send your application"][step] }),
+          h("p.panel-sub", { text: ["This appears on report cards, certificates and the portal itself.", "Tell us which sections you run, so your portal only shows what applies to you.", "This is the address your staff, students and parents will use.", "AMA EDU will review the application before creating the live school portal."][step] }),
         ),
         [stepSchool, stepSetup, stepSlug, stepAdmin][step](),
       ),
@@ -229,20 +228,16 @@ export default function render({ outlet }) {
   function stepAdmin() {
     const name  = h("input.input", { id: "aName", required: true, value: form.adminName, autocomplete: "name", oninput: bind("adminName") });
     const email = h("input.input", { id: "aEmail", type: "email", required: true, value: form.adminEmail, autocomplete: "email", oninput: bind("adminEmail") });
-    const pw = passwordField({ label: "Password", id: "aPass", autocomplete: "new-password", hint: "At least 8 characters. You can change it later from Settings." });
     const error = h("div");
-    const submit = h("button.btn.btn-primary.btn-block.btn-lg", { type: "submit", text: "Create school portal" });
+    const submit = h("button.btn.btn-primary.btn-block.btn-lg", { type: "submit", text: "Submit application" });
 
     return h("form", { novalidate: true, onsubmit: async (e) => {
       e.preventDefault();
       mount(error);
-      form.password = pw.input.value;
-
       if (!form.adminName.trim()) return mount(error, inlineAlert("Enter the administrator's full name."));
       if (!/^\S+@\S+\.\S+$/.test(form.adminEmail)) return mount(error, inlineAlert("Enter a valid email address for the administrator."));
-      if (form.password.length < 8) return mount(error, inlineAlert("Choose a password of at least 8 characters."));
 
-      setBusy(submit, true, "Creating your portal…");
+      setBusy(submit, true, "Submitting…");
       try {
         const created = await createSchool(form);
         renderDone(created);
@@ -257,8 +252,7 @@ export default function render({ outlet }) {
       error,
       field({ label: "Administrator's full name", id: "aName", control: name }),
       field({ label: "Administrator's email", id: "aEmail", control: email, hint: "Used to sign in and to receive password resets." }),
-      pw.node,
-      h("p.u-xs.u-muted", { text: "By registering you confirm you are authorised to create a portal for this school." }),
+      h("p.u-xs.u-muted", { text: "By applying you confirm you are authorised to represent this school. Do not send a password; the administrator account is created after approval." }),
       h("div.u-row.u-mt-4", {},
         h("button.btn.btn-outline", { type: "button", text: "Back", onclick: () => { step = 2; draw(); } }),
         h("div.u-grow", {}, submit),
@@ -266,18 +260,17 @@ export default function render({ outlet }) {
     );
   }
 
-  function renderDone({ slug }) {
-    const url = tenantUrl(slug, "/login");
+  function renderDone({ reference, status }) {
     mount(host,
       h("div.panel", {},
         h("div.panel-head", {},
           h("div.panel-crest", { text: "✓" }),
-          h("h1.panel-title", { text: "Your portal is ready" }),
-          h("p.panel-sub", { text: "Sign in with the administrator email and password you just set." }),
+          h("h1.panel-title", { text: "Application received" }),
+          h("p.panel-sub", { text: "Keep this reference. The AMA EDU team will review your application and contact the administrator email supplied." }),
         ),
-        h("div.alert.alert-success", {}, h("div", { text: `${slug}.${ROOT}` })),
-        h("a.btn.btn-primary.btn-block.btn-lg.u-mt-4", { href: url, "data-native": "true", text: "Open my school portal" }),
-        h("p.u-small.u-muted.u-mt-4", { text: "Next: add your classes and subjects, then your staff, then your students. Bulk Import takes a pasted CSV if you already have rosters." }),
+        h("div.alert.alert-success", {}, h("div", { text: `${reference} · ${status}` })),
+        h("a.btn.btn-outline.btn-block.btn-lg.u-mt-4", { href: "/find-school", "data-native": "true", text: "Find a school portal" }),
+        h("p.u-small.u-muted.u-mt-4", { text: "Once approved and provisioned, the administrator will receive the live portal address and setup instructions." }),
       ),
       h("div.panel-foot", { text: "Copyright © AMAEdu 2026 All Rights Reserved!" }),
     );
@@ -285,32 +278,17 @@ export default function render({ outlet }) {
 }
 
 /**
- * Registration is a single server-side transaction, not a sequence of
- * browser calls: the school row, the administrator's auth account, the
- * staff record linking them, and the school's default session/terms and
- * grading setup all succeed together or none of them do. Doing it from
- * the client would leave half-built schools behind whenever a phone
- * dropped signal midway.
+ * Registration submits one validated application. Provisioning is deliberately
+ * a separate platform-admin action so an anonymous visitor cannot create a
+ * live tenant or an administrator login without review.
  */
 async function createSchool(form) {
-  // invokeFunction keeps the function's own message (for example "That web
-  // address is already taken") instead of the generic non-2xx text.
-  return invokeFunction("register-school", {
-    school: {
-      name: form.name.trim(),
-      slug: form.slug,
-      school_type: form.type,
-      email: form.email.trim(),
-      phone: form.phone.trim(),
-      address: form.address.trim(),
-      sections: [...form.sections],
-      declared_student_count: form.studentCount === "" ? null : Number(form.studentCount),
-      report_card_template: form.template,
-    },
-    admin: {
-      full_name: form.adminName.trim(),
-      email: form.adminEmail.trim(),
-      password: form.password,
-    },
-  });
+  const { data, error } = await supabase.rpc("submit_school_application", { p_payload: {
+    school_name: form.name.trim(), slug: form.slug, school_type: form.type,
+    school_email: form.email.trim(), school_phone: form.phone.trim(), address: form.address.trim(),
+    sections: [...form.sections], declared_student_count: form.studentCount === "" ? null : Number(form.studentCount),
+    report_card_template: form.template, admin_full_name: form.adminName.trim(), admin_email: form.adminEmail.trim(),
+  } });
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : data;
 }

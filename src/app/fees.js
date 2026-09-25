@@ -70,15 +70,17 @@ export default async function render({ outlet }) {
     draw();
     const host = document.getElementById("feesHost");
     try {
-      const [structureRows, students] = await Promise.all([
+      const selectedClass = state.classes.find((item) => item.id === state.classId);
+      const [structureRows, sectionRows, students] = await Promise.all([
         unwrap(await supabase.from("fee_structure").select("*").eq("class_id", state.classId).eq("term_id", state.term.id).limit(1), "fetch fee structure"),
+        unwrap(await supabase.from("school_section_fees").select("section, amount").eq("term_id", state.term.id).eq("section", selectedClass?.category || "primary").limit(1), "fetch section fee"),
         unwrap(await supabase.from("students").select("id, full_name, admission_no").eq("class_id", state.classId).eq("is_active", true).order("full_name"), "fetch students"),
       ]);
       const studentIds = students.map((s) => s.id);
       const payments = studentIds.length
         ? unwrap(await supabase.from("fee_payments").select("*").eq("term_id", state.term.id).in("student_id", studentIds), "fetch payments")
         : [];
-      state.structure = structureRows?.[0] || null;
+      state.structure = structureRows?.[0] || (sectionRows?.[0] ? { amount: sectionRows[0].amount, isSectionDefault: true } : null);
       const byStudent = new Map(payments.map((p) => [p.student_id, p]));
       state.students = students.map((s) => ({ ...s, payment: byStudent.get(s.id) || null }));
       state.dirty.clear();
@@ -114,7 +116,7 @@ export default async function render({ outlet }) {
     mount(host,
       h("div.card.u-mt-4", { style: { marginBottom: "16px" } },
         h("div.u-row.u-wrap", {},
-          h("div.u-grow", {}, h("div.stat-label", { text: "Fee for this class, this term" }), amountInput),
+          h("div.u-grow", {}, h("div.stat-label", { text: state.structure?.isSectionDefault ? "Section default fee for this class" : "Fee for this class, this term" }), amountInput),
           saveStructBtn,
         ),
         structNote,

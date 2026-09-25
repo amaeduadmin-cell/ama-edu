@@ -28,9 +28,10 @@ export default async function render({ outlet }) {
 
   try {
     const schools = unwrap(await supabase.from("schools").select("id, name, slug, status, school_type, created_at").order("created_at", { ascending: false }), "fetch schools");
-    const [{ count: studentTotal }, { count: staffTotal }] = await Promise.all([
+    const [{ count: studentTotal }, { count: staffTotal }, { count: pendingApplications }] = await Promise.all([
       supabase.from("students").select("id", { count: "exact", head: true }),
       supabase.from("staff").select("id", { count: "exact", head: true }),
+      supabase.from("school_applications").select("id", { count: "exact", head: true }).eq("status", "pending"),
     ]);
 
     const byStatus = { active: 0, pending: 0, suspended: 0, closed: 0 };
@@ -40,8 +41,9 @@ export default async function render({ outlet }) {
       h("div.page-head", {}, h("h1", { text: "Platform overview" })),
       h("div.stat-grid", {},
         stat("Schools", schools.length), stat("Active", byStatus.active),
-        stat("Students (all schools)", studentTotal ?? "—"), stat("Staff (all schools)", staffTotal ?? "—"),
+        stat("Students (all schools)", studentTotal ?? "—"), stat("Staff (all schools)", staffTotal ?? "—"), stat("Pending applications", pendingApplications ?? "—"),
       ),
+      h("section.card.u-mt-6", {}, h("div.card-head", {}, h("div", {}, h("h2.card-title", { text: "School onboarding" }), h("div.card-sub", { text: "Review applications and bring approved schools online." })), h("a.btn.btn-primary.btn-sm", { href: "/admin/applications", text: "Review applications" }))),
       h("section.card.u-mt-6", {},
         h("div.card-head", {}, h("h2.card-title", { text: "Recently registered" }), h("a.btn.btn-outline.btn-sm", { href: "/admin/schools", text: "All schools" })),
         h("div.table-wrap", {}, h("table.table", {},

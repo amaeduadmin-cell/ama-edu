@@ -139,6 +139,7 @@ const ROLE_LABELS = {
 const PLATFORM_NAV = [
   ["/admin",         "Overview",       "Platform"],
   ["/admin/schools", "Schools",        "Platform"],
+  ["/admin/applications", "Applications", "Platform"],
   ["/admin/content", "Public website", "Platform"],
 ];
 

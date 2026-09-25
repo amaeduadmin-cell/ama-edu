@@ -215,6 +215,131 @@
   }
 }
 
+/* ---------- Template 4: Pariya Classic (rc-pariya) ----------
+   Exact port of newpariyacentral's buildReportCardHtml() markup and
+   colours, behaviour-only (see migration 0035 / lib/reportcard.js for
+   why none of its client-side privilege logic came with it).
+
+   IMPORTANT: the source doc's CSS used bare, unscoped selectors —
+   .card, .rc-header, .rc-motto, .bottom-row, etc. `.card` in particular
+   is this app's own site-wide card component (components.css) used on
+   every settings/dashboard panel; pasting it unscoped would have
+   reskinned the entire app navy, not just this report card. Every
+   selector below is therefore namespaced under .rc-pariya, and the
+   Pariya-specific ones renamed rc4-* (matching the rc3-* convention
+   Template 3/Heritage already established), so nothing here can leak
+   onto Templates 1/2/3 or the dashboard shell. Colours, spacing and
+   layout are otherwise unchanged from the spec. */
+.rc-pariya {
+  --rc4-navy:     #5C3317;
+  --rc4-green:    #1F7A3D;
+  --rc4-green-bg: #E9F6EE;
+  --rc4-blue:     #1E4FA0;
+  --rc4-blue-bg:  #EAF1FC;
+  --rc4-purple:   #6A3FA0;
+  --rc4-red:      #C0392B;
+  border: 2.5px solid var(--rc4-navy);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: #2A1810;
+}
+
+.rc4-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 6px; }
+.rc4-logo-box { flex: none; width: 78px; }
+.rc4-logo-box img, .rc4-logo-box .rc4-crest-fallback { width: 78px; height: 78px; object-fit: contain; }
+.rc4-crest-fallback {
+  display: grid; place-items: center; border-radius: 8px;
+  background: var(--rc4-green-bg); color: var(--rc4-navy); font-weight: 800; font-size: 26px;
+}
+.rc4-title-block { flex: 1; text-align: center; padding-top: 2px; min-width: 0; }
+.rc4-title-block h2 {
+  color: var(--rc4-navy); font-size: 24px; font-weight: 900; letter-spacing: 0.02em;
+  margin: 0 0 3px; text-transform: uppercase; line-height: 1.1; font-family: var(--font-display);
+}
+.rc4-address { font-size: 13px; font-weight: 700; color: #2A1810; margin: 0 0 3px; }
+.rc4-contact { font-size: 12px; font-weight: 700; color: var(--rc4-navy); display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.rc4-photo-box {
+  flex: none; width: 64px; height: 64px; border-radius: 8px; border: 2px solid var(--rc4-navy);
+  overflow: hidden; background: #EDE0CC; display: flex; align-items: center; justify-content: center;
+}
+.rc4-photo-box img { width: 100%; height: 100%; object-fit: cover; }
+.rc4-motto { text-align: center; font-size: 14px; font-weight: 900; color: #2A1810; margin: 3px 0 0; }
+
+.rc4-divider { border: 0; border-top: 1.5px solid var(--rc4-navy); opacity: 0.35; margin: 8px 0; }
+
+.rc4-banner-wrap { text-align: center; margin-bottom: 8px; }
+.rc4-banner {
+  display: inline-block; background: var(--rc4-green); color: #fff; font-size: 14px; font-weight: 900;
+  letter-spacing: 0.04em; padding: 6px 26px; border-radius: 999px; text-transform: uppercase;
+}
+
+.rc4-infobox { border: 2px solid var(--rc4-navy); border-radius: 10px; padding: 9px 14px; margin-bottom: 10px; }
+.rc4-info-cols { display: flex; gap: 0; }
+.rc4-info-col-left { flex: 0 0 30%; display: flex; flex-direction: column; border-right: 1.5px solid var(--rc4-navy); padding-right: 8px; margin-right: 8px; }
+.rc4-info-col-mid { flex: 0 0 33%; display: flex; flex-direction: column; border-right: 1.5px solid var(--rc4-navy); padding-right: 8px; margin-right: 8px; }
+.rc4-info-col-right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.rc4-info-line { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; padding: 4px 0; font-size: 13px; font-weight: 800; }
+.rc4-info-line + .rc4-info-line { border-top: 1.5px solid var(--rc4-navy); }
+.rc4-info-line .rc4-label { color: var(--rc4-navy); font-weight: 900; white-space: nowrap; }
+.rc4-info-line .rc4-value {
+  border-bottom: 1px solid rgba(42, 24, 16, 0.5); flex: 1; margin-left: 4px; min-width: 0;
+  display: inline-block; padding: 0 2px; font-weight: 800; color: #2A1810; text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rc4-info-col-left .rc4-info-line .rc4-value { font-weight: 900; color: var(--rc4-navy); font-size: 14px; }
+
+.rc4-perf-banner {
+  background: var(--rc4-blue); color: #fff; text-align: center; font-size: 12px; font-weight: 900;
+  letter-spacing: 0.03em; padding: 6px 8px; border-radius: 6px 6px 0 0; text-transform: uppercase;
+}
+
+.rc4-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rc4-table th, .rc4-table td { border: 1px solid var(--rc4-blue); padding: 4.5px 5px; font-size: 12px; font-weight: 800; color: #2A1810; text-align: center; }
+.rc4-table td:nth-child(2) { text-align: left; }
+.rc4-table thead th { background: var(--rc4-blue-bg); color: var(--rc4-blue); }
+.rc4-table tbody tr:nth-child(even) td { background: var(--rc4-blue-bg); }
+
+.rc4-annual-box { border: 1.5px solid var(--rc4-navy); border-radius: 8px; padding: 6px 10px; margin: 10px 0; background: #FBF6EC; }
+.rc4-annual-title { font-size: 11px; font-weight: 900; color: var(--rc4-navy); text-align: center; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.04em; }
+.rc4-annual-box table { width: 100%; border-collapse: collapse; }
+.rc4-annual-box th { background: var(--rc4-navy); color: #fff; padding: 4px 3px; font-size: 9.5px; font-weight: 800; border: 1px solid var(--rc4-navy); }
+.rc4-annual-box td { background: #fff; padding: 4px 3px; font-size: 9.5px; font-weight: 800; border: 1px solid rgba(0,0,0,0.15); text-align: center; }
+
+.rc4-remarks-box { border: 1.5px solid var(--rc4-red); border-radius: 8px; padding: 8px 12px; }
+.rc4-remark-line { font-size: 11px; font-weight: 800; color: #2A1810; padding: 3px 0; }
+.rc4-remark-line .rc4-label { color: var(--rc4-red); font-weight: 900; margin-right: 4px; }
+.rc4-muted { color: var(--ama-slate); font-weight: 600; }
+
+.rc4-bottom-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; gap: 8px; }
+.rc4-sign { flex: 1 1 30%; text-align: center; display: flex; flex-direction: column; justify-content: flex-end; }
+.rc4-sign img.rc4-sig-img { max-width: 100%; height: 38px; object-fit: contain; margin-bottom: -5px; }
+.rc4-sign-line { border-top: 1.5px solid #1A0F08; margin: 4px auto 2px; width: 75%; }
+.rc4-sign-label { font-size: 10px; color: var(--ama-slate); }
+.rc4-sign-name { font-size: 11px; font-weight: 700; }
+.rc4-mid-col { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; text-align: center; }
+.rc4-seal-box {
+  width: 78px; height: 78px; background: #fff; padding: 1px; border: 1px solid var(--rc4-purple);
+  display: flex; align-items: center; justify-content: center; border-radius: 6px;
+  font-size: 7px; font-weight: 700; color: var(--rc4-purple); text-align: center; letter-spacing: 0.04em;
+}
+
+@media (max-width: 640px) {
+  .rc-pariya { padding: 10px; }
+  .rc4-header { flex-wrap: wrap; }
+  .rc4-info-cols { flex-direction: column; }
+  .rc4-info-col-left, .rc4-info-col-mid { border-right: 0; border-bottom: 1.5px solid var(--rc4-navy); padding-right: 0; margin-right: 0; padding-bottom: 6px; margin-bottom: 6px; }
+  .rc4-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .rc4-bottom-row { flex-wrap: wrap; }
+}
+
+@media print {
+  .rc-pariya { border: 2.5px solid var(--rc4-navy) !important; }
+  .rc4-banner, .rc4-perf-banner, .rc4-table thead th, .rc4-annual-box th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 /* ---------- mobile ---------- */
 @media (max-width: 640px) {
   .report-card { padding: 16px 14px; }

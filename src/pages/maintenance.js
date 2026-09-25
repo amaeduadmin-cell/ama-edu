@@ -10,6 +10,7 @@ export default async function render({ outlet }) {
     h("div#maintenanceBody", {}, h("p.u-muted", { text: "Checking maintenance status…" })),
     h("div.panel-foot", {}, h("a", { href: platformUrl("/status"), text: "View system status" })),
   ));
+  mount(outlet, body);
   try {
     const { data, error } = await supabase.rpc("public_platform_maintenance");
     if (error) throw error;

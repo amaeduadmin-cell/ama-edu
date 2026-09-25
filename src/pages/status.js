@@ -15,6 +15,7 @@ export default async function render({ outlet }) {
     h("div#statusBody", {}, h("p.u-muted", { text: "Checking services…" })),
     h("div.panel-foot", {}, h("a", { href: platformUrl("/"), text: "Back to AMA EDU" })),
   ));
+  mount(outlet, body);
   try {
     const { data, error } = await supabase.rpc("public_service_status");
     if (error) throw error;

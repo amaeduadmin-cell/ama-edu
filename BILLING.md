@@ -12,3 +12,5 @@ AMA EDU billing is separate from school fee collection. School fees remain in `s
 Pricing is data-driven. Old invoices must never be recalculated from today's student count. Payment gateway secrets must be configured as Edge Function secrets; the admin UI can disable the gateway connection without exposing or deleting a secret.
 
 Automated invoice generation, provider webhooks, and scheduled usage aggregation should run as authenticated Edge Functions or scheduled jobs, not in the browser.
+
+Migration `0050_invoice_generation_snapshot.sql` adds the first server-side invoice-generation operation. A platform administrator supplies a school, active plan, and billing period; the function snapshots the current active-student count, calculates the configured base/per-student total, writes immutable invoice line items, and prevents duplicate invoices for the same school and period with a unique index. It does not process a payment or claim that an invoice is paid.

@@ -30,13 +30,14 @@ export default async function render({ outlet }) {
   mount(body, skeleton(5));
   onDataChanged(() => resolve());
 
-  let term, children, rc;
+  let term, children, rc, payment;
   try {
     term = await fetchActiveTerm();
     if (!term) return mount(body, emptyState({ title: "No active term", body: "The school has not started a term yet." }));
-    [children, rc] = await Promise.all([
+    [children, rc, payment] = await Promise.all([
       unwrap(await supabase.rpc("my_children_overview"), "children overview"),
       loadReportCardContext(supabase, unwrap),
+      unwrap(await supabase.from("school_payment_settings").select("method, bank_name, account_name, account_number, payment_instructions").eq("is_active", true).limit(1), "payment instructions"),
     ]);
   } catch (err) {
     logError("parent boot", err);
@@ -50,7 +51,21 @@ export default async function render({ outlet }) {
     }));
   }
 
+  if (payment?.[0]) mount(body, paymentCard(payment[0]));
   mount(body, children.map(childCard));
+
+  function paymentCard(p) {
+    return h("section.card", { style: { borderLeft: "4px solid var(--ama-gold)" } },
+      h("div.card-head", {}, h("div", {}, h("h2.card-title", { text: "School payment instructions" }), h("div.card-sub", { text: "Use these details only for this school portal. Keep your receipt after payment." })), h("span.badge.badge-info", { text: "Private" })),
+      h("div.form-grid.cols-2", {},
+        h("div", {}, h("div.u-xs.u-muted", { text: "Bank" }), h("div", { style: { fontWeight: "600" }, text: p.bank_name || "—" })),
+        h("div", {}, h("div.u-xs.u-muted", { text: "Account name" }), h("div", { style: { fontWeight: "600" }, text: p.account_name || "—" })),
+        h("div", {}, h("div.u-xs.u-muted", { text: "Account number" }), h("div", { style: { fontWeight: "700", letterSpacing: "1px" }, text: p.account_number || "—" })),
+        h("div", {}, h("div.u-xs.u-muted", { text: "Payment method" }), h("div", { text: p.method === "manual" ? "Manual confirmation" : "Bank transfer" })),
+      ),
+      p.payment_instructions ? h("p.u-small.u-muted", { text: p.payment_instructions }) : null,
+    );
+  }
 
   function childCard(c) {
     const host = h("div.u-mt-4");

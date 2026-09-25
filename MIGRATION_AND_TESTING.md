@@ -72,3 +72,9 @@ The application migration `0042_school_applications.sql` and section-fee migrati
 ## Academic settings deployment check
 
 Academic settings loads several administrator-only RPCs in one request. The live project was missing `report_card_signatories`, `admission_scheme_preview`, and `staff_code_scheme_preview`, so the page correctly fell into its error state even though the frontend build passed. Migrations `0040_report_card_signatories.sql`, `0041_auto_admission_numbers.sql`, and `0042_staff_codes_and_default_passwords.sql` have now been applied to the live project. All RPC names called by the frontend and all referenced public tables were then checked against the live schema; the dependency audit found no remaining missing object.
+
+## School payment settings and founder profile
+
+School administrators configure **Settings → School payment instructions** with a bank name, account name, account number, and family-facing instructions. This is an account-payment workflow, not an API gateway: no API keys, card data, PINs, passwords, or gateway secrets are accepted or stored. RLS limits reads to authenticated members of that school and limits writes to school administrators. Active instructions are shown to authenticated parents in the school portal; they are not exposed through public school profiles.
+
+Platform administrators can edit the public founder section under **AMA EDU admin → Public website → Website**, including founder name, title, history, and an HTTPS image URL. The landing page renders the section only from the public CMS RPC and validates image URLs as HTTPS before inserting them as images. The platform stores the URL rather than handling arbitrary file uploads.

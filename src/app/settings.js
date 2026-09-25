@@ -36,11 +36,13 @@ export default async function render({ outlet }) {
       const sectionFees = activeTerm
         ? unwrap(await supabase.from("school_section_fees").select("id, section, amount").eq("term_id", activeTerm.id), "fetch section fees")
         : [];
+      const paymentRows = unwrap(await supabase.from("school_payment_settings").select("*").eq("school_id", session.schoolId).limit(1), "fetch school payment settings");
       mount(body,
         generalCard(school),
         brandingCard(school),
         academicCard(terms),
         sectionFeesCard(activeTerm, sectionFees),
+        schoolPaymentCard(paymentRows?.[0] || {}),
         admissionCard(school),
         passwordCard(),
       );
@@ -51,6 +53,36 @@ export default async function render({ outlet }) {
   } else {
     mount(body, passwordCard());
   }
+}
+
+function schoolPaymentCard(existing) {
+  const method = h("select.select", {}, [["bank_transfer", "Bank transfer / account payment"], ["manual", "Manual payment confirmation"], ["both", "Bank transfer and manual confirmation"]].map(([value, label]) => h("option", { value, selected: (existing.method || "bank_transfer") === value, text: label })));
+  const bank = h("input.input", { value: existing.bank_name || "", placeholder: "Bank name" });
+  const accountName = h("input.input", { value: existing.account_name || "", placeholder: "School account name" });
+  const accountNumber = h("input.input", { value: existing.account_number || "", inputmode: "numeric", autocomplete: "off", placeholder: "Account number" });
+  const instructions = h("textarea.input", { rows: "4" }, existing.payment_instructions || "Pay using the student admission number as the transfer narration, then send the receipt to the bursar.");
+  const active = h("input", { type: "checkbox", checked: existing.is_active !== false, style: { width: "20px", height: "20px" } });
+  const note = h("div");
+  const save = h("button.btn.btn-primary", { type: "button", text: "Save payment instructions" });
+  save.addEventListener("click", async () => {
+    if (!bank.value.trim() && !accountNumber.value.trim()) return mount(note, inlineAlert("Enter at least a bank name or account number."));
+    if (accountNumber.value.trim() && !/^[0-9A-Za-z /-]{6,40}$/.test(accountNumber.value.trim())) return mount(note, inlineAlert("Enter a valid account number."));
+    setBusy(save, true, "Saving…");
+    try {
+      unwrap(await supabase.from("school_payment_settings").upsert({ school_id: session.schoolId, method: method.value, bank_name: bank.value.trim() || null, account_name: accountName.value.trim() || null, account_number: accountNumber.value.trim() || null, payment_instructions: instructions.value.trim() || null, is_active: active.checked, updated_by: session.staffId || null }, { onConflict: "school_id" }), "save school payment settings");
+      toastOk("Payment instructions saved");
+    } catch (err) { mount(note, inlineAlert(humanError(err))); } finally { setBusy(save, false); }
+  });
+  return h("section.card", {},
+    h("div.card-head", {}, h("div", {}, h("h2.card-title", { text: "School payment instructions" }), h("div.card-sub", { text: "A private bank-transfer configuration for authenticated members of this school. No API keys or gateway secrets are stored." })), h("span.badge.badge-info", { text: "Secure" })),
+    inlineAlert("Students and parents can see these instructions only after signing in to this school portal. Staff and administrators can record payments in Fees. Never paste a bank PIN, password, secret key, or card number here.", "info"),
+    field({ label: "Payment method", id: "schoolPayMethod", control: method }),
+    h("div.form-grid.cols-2", {}, field({ label: "Bank name", id: "schoolPayBank", control: bank }), field({ label: "Account name", id: "schoolPayAccountName", control: accountName })),
+    field({ label: "Account number", id: "schoolPayAccountNumber", control: accountNumber }),
+    field({ label: "Instructions for families", id: "schoolPayInstructions", control: instructions }),
+    h("label.u-row", { style: { gap: "8px", margin: "10px 0" } }, active, h("span", { text: "Show these instructions in the school portal" })),
+    note, save,
+  );
 }
 
 function sectionFeesCard(term, rows) {

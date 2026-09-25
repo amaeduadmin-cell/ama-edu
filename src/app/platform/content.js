@@ -70,6 +70,10 @@ export default async function render({ outlet }) {
     const name = h("input.input", { value: s.site_name || "" });
     const tagline = h("input.input", { value: s.tagline || "" });
     const about = h("textarea.input", { rows: "5" }, s.about_text || "");
+    const founderName = h("input.input", { value: s.founder_name || "", placeholder: "Founder name" });
+    const founderTitle = h("input.input", { value: s.founder_title || "", placeholder: "Founder and education advocate" });
+    const founderHistory = h("textarea.input", { rows: "6" }, s.founder_history || "");
+    const founderImage = h("input.input", { type: "url", value: s.founder_image_url || "", placeholder: "https://…" });
     const email = h("input.input", { type: "email", value: s.contact_email || "" });
     const phone = h("input.input", { type: "tel", value: s.contact_phone || "" });
     const address = h("input.input", { value: s.contact_address || "" });
@@ -84,6 +88,10 @@ export default async function render({ outlet }) {
       row(field({ label: "Site name", id: "pName", control: name }),
           field({ label: "Tagline", id: "pTag", control: tagline })),
       field({ label: "About", id: "pAbout", control: about }),
+      row(field({ label: "Founder name", id: "pFounderName", control: founderName }),
+          field({ label: "Founder title", id: "pFounderTitle", control: founderTitle })),
+      field({ label: "Founder history", id: "pFounderHistory", control: founderHistory, hint: "This appears in the public Founder & story section." }),
+      field({ label: "Founder image URL", id: "pFounderImage", control: founderImage, hint: "Use a trusted HTTPS image URL. The platform stores the URL, not an uploaded file." }),
       row(field({ label: "Contact email", id: "pEmail", control: email }),
           field({ label: "Contact phone", id: "pPhone", control: phone })),
       field({ label: "Contact address", id: "pAddr", control: address }),
@@ -101,6 +109,8 @@ export default async function render({ outlet }) {
         site_name: name.value.trim() || "AMA EDU", tagline: tagline.value.trim() || null,
         about_text: about.value.trim() || null, contact_email: email.value.trim() || null,
         contact_phone: phone.value.trim() || null, contact_address: address.value.trim() || null,
+        founder_name: founderName.value.trim() || null, founder_title: founderTitle.value.trim() || null,
+        founder_history: founderHistory.value.trim() || null, founder_image_url: founderImage.value.trim() || null,
         logo_url: logo.value.trim() || null, favicon_url: favicon.value.trim() || null,
         announcement: announcement.value.trim() || null,
         features: parsedFeatures, faqs: parsedFaqs,

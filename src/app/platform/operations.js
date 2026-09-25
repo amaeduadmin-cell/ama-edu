@@ -39,7 +39,7 @@ export default async function render({ outlet }) {
       } catch (err) { toastError(humanError(err)); } finally { setBusy(saveMaintenance, false); }
     };
     mount(body,
-      h("div.card", {}, h("h2.card-title", { text: "Maintenance" }), inlineAlert("This controls the recorded maintenance state. Edge-level interception still needs to be configured at Cloudflare for traffic-wide enforcement.", "info"), h("label.u-row", { style: { gap: "8px", margin: "12px 0" } }, maintenanceEnabled, h("span", { text: "Maintenance enabled" })), field({ label: "Message", id: "maintenanceMessage", control: message }), saveMaintenance),
+      h("div.card", {}, h("h2.card-title", { text: "Maintenance" }), inlineAlert("This controls the recorded maintenance state. Public platform routes redirect to the maintenance page while enabled; Cloudflare edge enforcement remains an optional defense-in-depth layer.", "info"), h("label.u-row", { style: { gap: "8px", margin: "12px 0" } }, maintenanceEnabled, h("span", { text: "Maintenance enabled" })), field({ label: "Message", id: "maintenanceMessage", control: message }), saveMaintenance),
       h("div.card", {}, h("h2.card-title", { text: "Service status" }), state.services.map(serviceRow)),
       planForm(state.plans),
       billingRecords(state.subscriptions, state.invoices),

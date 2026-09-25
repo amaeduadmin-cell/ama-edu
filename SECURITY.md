@@ -11,6 +11,8 @@
 - Account Settings supports Supabase TOTP MFA enrollment, challenge verification, assurance display, and factor removal. TOTP secrets remain with Supabase Auth and are not stored by AMA EDU.
 - Data exports are admin-only and tenant-scoped, use forced RLS on export jobs, private Storage, and one-hour signed URLs. The export Edge Function re-checks the caller's school and role before reading any records.
 - Public `/privacy`, `/terms`, and `/acceptable-use` pages document platform, school, and user responsibilities without exposing tenant data.
+- Score revisions are database-created after score inserts/updates and cannot be edited by authenticated clients. Correction requests are tenant-scoped, require a staff requester, and administrator approval writes the replacement through a SECURITY DEFINER RPC plus audit event.
+- Offline score entry stores only bounded pending score batches in browser local storage, never service-role credentials or private API responses. Queued batches are retried after connectivity returns and remain subject to the same RLS, score validation, lock, and period-window rules when synced.
 
 ## Required test cases
 

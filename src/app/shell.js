@@ -26,6 +26,7 @@ const NAV_BY_ROLE = {
     ["/classes",         "Classes & scores", "Teaching"],
     ["/bulk-score-import", "Bulk score import", "Teaching"],
     ["/score-control",   "Score control",   "Teaching"],
+    ["/corrections",     "Score corrections", "Results"],
     ["/class-management", "Class management", "Teaching"],
     ["/master-list",   "Master list",    "Teaching"],
     ["/curriculum",    "Curriculum",     "Teaching"],

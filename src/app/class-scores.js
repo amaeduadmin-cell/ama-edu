@@ -3,9 +3,10 @@ import { h, mount, skeleton, setBusy } from "../lib/dom.js";
 import { page, requireRole } from "./shell.js";
 import { supabase } from "../lib/supabase.js";
 import { unwrap, humanError, logError } from "../lib/errors.js";
-import { emptyState, errorState, toastOk, toastError, inlineAlert, openModal } from "../lib/ui.js";
+import { emptyState, errorState, toastOk, toastError, inlineAlert, openModal, field } from "../lib/ui.js";
 import { fetchActiveTerm } from "../lib/data.js";
 import { hasRole, session } from "../lib/auth.js";
+import { enqueueScoreBatch, pendingScoreCount, registerOfflineSync } from "../lib/offline.js";
 
 const PERIODS = [
   ["ca1", "CA1", "ca1_max"],
@@ -33,7 +34,13 @@ export default async function render({ outlet, params }) {
       ? unwrap(await supabase.from("class_subjects").select("subject_id, subjects(id,name)").eq("class_id", classId), "fetch subjects").map((r) => r.subjects)
       : unwrap(await supabase.from("class_teacher_subjects").select("subject_id, subjects(id,name)").eq("class_id", classId).eq("staff_id", session.staffId || ""), "fetch my subjects").map((r) => r.subjects);
     draw();
-    if (state.subjects.length) { state.subjectId = state.subjects[0].id; await loadScores(); }
+    if (state.subjects.length) {
+      state.subjectId = state.subjects[0].id;
+      await loadScores();
+      registerOfflineSync(async (rows, meta) => {
+        await persistBatch(rows, meta);
+      }, () => loadScores());
+    }
   } catch (err) { logError("class-scores boot", err); mount(body, errorState(humanError(err))); }
 
   function draw() {
@@ -73,10 +80,10 @@ export default async function render({ outlet, params }) {
     if (!state.students.length) return mount(host, emptyState({ title: "No students in this class", body: "Admit students from the Students page first." }));
     const w = state.weights;
     const saveBtn = h("button.btn.btn-primary", { type: "button", text: "Save scores", disabled: !PERIODS.some(([period]) => canEdit(period)) });
-    const note = h("div.u-xs.u-muted");
+    const note = h("div.u-xs.u-muted", { text: pendingScoreCount() ? `${pendingScoreCount()} score change(s) waiting to sync when online.` : "" });
     const numInput = (student, key, max) => h("input.input.u-num", { type: "number", min: "0", max: String(max), step: "0.5", value: student.score?.[key] ?? "", style: { maxWidth: "76px" }, disabled: !canEdit(key), oninput: (e) => { student._edits[key] = e.target.value === "" ? null : Number(e.target.value); state.dirty.add(student.id); saveBtn.disabled = false; } });
     const controls = PERIODS.map(([period, label]) => periodControl(period, label));
-    const headings = ["Student", `CA1 /${w.ca1_max}`, `CA2 /${w.ca2_max}`, `CA3 /${w.ca3_max}`, `Exam /${w.exam_max}`, "Total", "Grade", "Pos."];
+    const headings = ["Student", `CA1 /${w.ca1_max}`, `CA2 /${w.ca2_max}`, `CA3 /${w.ca3_max}`, `Exam /${w.exam_max}`, "Total", "Grade", "Pos.", "Correction"];
     const rows = state.students.map((student) => h("tr", {},
       h("td", {}, h("div", { style: { fontWeight: "600" }, text: student.full_name }), h("div.u-xs.u-muted", { text: student.admission_no })),
       h("td.num", {}, numInput(student, "ca1", w.ca1_max)),
@@ -86,6 +93,7 @@ export default async function render({ outlet, params }) {
       h("td.num.u-num", { text: student.score?.total ?? "—" }),
       h("td.num", {}, student.score?.grade ? h("span.badge.badge-ok", { text: student.score.grade }) : "—"),
       h("td.num", { text: student.score?.subject_position ?? "—" }),
+      h("td", {}, student.score ? h("button.btn.btn-ghost.btn-sm", { type: "button", text: "Request", onclick: () => openCorrection(student) }) : null),
     ));
     mount(host,
       h("div.u-row.u-wrap.u-mb-3", {}, controls),
@@ -107,6 +115,21 @@ export default async function render({ outlet, params }) {
     return h("div.card", { style: { minWidth: "185px", flex: "1 1 185px" } }, h("div.u-row", { style: { justifyContent: "space-between" } }, h("strong", { text: label }), h(`span.badge.${badgeClass}`, { text: status })), h("div.u-row.u-mt-2", {}, submit, request));
   }
 
+  function openCorrection(student) {
+    const score = student.score;
+    const controls = Object.fromEntries(["ca1", "ca2", "ca3", "exam"].map(key => [key, h("input.input.u-num", { type: "number", min: "0", max: "100", step: "0.5", value: score?.[key] ?? "" })]));
+    const reason = h("textarea.textarea", { rows: "3", placeholder: "Explain the correction and the approved evidence." });
+    const note = h("div");
+    const send = h("button.btn.btn-primary", { type: "button", text: "Submit correction request" });
+    const close = openModal({ title: `Correction for ${student.full_name}`, body: h("div.u-stack", {}, h("p.u-small.u-muted", { text: "An administrator must approve this proposed replacement. The current result remains unchanged until approval." }), h("div.form-grid.cols-2", {}, ...Object.entries(controls).map(([key, control]) => field({ label: key.toUpperCase(), id: `correction-${key}`, control }))), field({ label: "Reason", id: "correctionReason", control: reason }), note), actions: [h("button.btn.btn-outline", { type: "button", text: "Cancel", onclick: () => close() }), send] });
+    send.onclick = async () => {
+      if (reason.value.trim().length < 5) return mount(note, inlineAlert("Provide a short reason for this correction."));
+      const values = Object.fromEntries(Object.entries(controls).map(([key, control]) => [key, control.value === "" ? null : Number(control.value)]));
+      setBusy(send, true, "Sending…");
+      try { unwrap(await supabase.rpc("request_score_correction", { p_score_id: score.id, p_values: values, p_reason: reason.value.trim() }), "request score correction"); toastOk("Correction request sent to the administrator"); close(); } catch (err) { mount(note, inlineAlert(humanError(err))); } finally { setBusy(send, false); }
+    };
+  }
+
   function openUnlockRequest(period, label) {
     const eligible = state.students.filter((student) => student.score && ["ca1", "ca2", "ca3", "exam"].some((key) => student.score[key] != null));
     const checks = eligible.map((student) => { const input = h("input", { type: "checkbox", checked: true }); return { student, input, node: h("label.u-row", {}, input, h("span", { text: `${student.full_name} (${student.admission_no})` })) }; });
@@ -119,8 +142,28 @@ export default async function render({ outlet, params }) {
     const changed = state.students.filter((student) => state.dirty.has(student.id)); if (!changed.length) return;
     const rows = changed.map((student) => ({ school_id: state.klass.school_id, student_id: student.id, class_id: classId, subject_id: state.subjectId, term_id: state.term.id, ca1: student._edits.ca1 ?? student.score?.ca1 ?? null, ca2: student._edits.ca2 ?? student.score?.ca2 ?? null, ca3: student._edits.ca3 ?? student.score?.ca3 ?? null, exam: student._edits.exam ?? student.score?.exam ?? null, entered_by: session.staffId || null }));
     setBusy(saveBtn, true, "Saving…");
-    try { unwrap(await supabase.from("student_scores").upsert(rows, { onConflict: "student_id,subject_id,term_id" }), "save scores"); mount(note, "Recalculating averages and positions…"); await supabase.rpc("recompute_class_term", { p_class_id: classId, p_term_id: state.term.id }); toastOk("Scores saved"); await loadScores(); }
-    catch (err) { toastError(humanError(err, "Some scores could not be saved.")); mount(note, inlineAlert(humanError(err))); }
+    try {
+      if (navigator.onLine === false) {
+        enqueueScoreBatch(rows, { classId, termId: state.term.id });
+        toastOk("Scores saved offline and queued for sync");
+        await loadScores();
+        return;
+      }
+      await persistBatch(rows, { classId, termId: state.term.id });
+      toastOk("Scores saved");
+      await loadScores();
+    } catch (err) {
+      if (navigator.onLine === false) {
+        enqueueScoreBatch(rows, { classId, termId: state.term.id });
+        toastOk("Connection lost — scores queued for sync");
+        await loadScores();
+      } else { toastError(humanError(err, "Some scores could not be saved.")); mount(note, inlineAlert(humanError(err))); }
+    }
     finally { setBusy(saveBtn, false); }
+  }
+
+  async function persistBatch(rows, meta) {
+    unwrap(await supabase.from("student_scores").upsert(rows, { onConflict: "student_id,subject_id,term_id" }), "save scores");
+    if (meta?.classId && meta?.termId) await supabase.rpc("recompute_class_term", { p_class_id: meta.classId, p_term_id: meta.termId });
   }
 }

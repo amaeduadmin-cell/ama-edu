@@ -23,6 +23,8 @@ import { startRealtime, stopRealtime } from "./lib/realtime.js";
 import { hasConfig } from "./lib/supabase.js";
 import { logError } from "./lib/errors.js";
 
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+
 /** Shared, read-only view of the boot result. */
 export const context = {
   tenantSlug: null,
@@ -129,6 +131,7 @@ function registerTenantRoutes() {
   register("/classes/:id",     page("class-scores"),   staff);
   register("/bulk-score-import", page("bulk-score-import"), staff);
   register("/score-control",   page("score-control"),   { requires: "admin" });
+  register("/corrections",     page("corrections"),     { requires: "admin" });
   register("/notifications",   page("notifications"),   staff);
   register("/students",        page("students"),       staff);
   register("/student-operations", page("student-operations"), staff);

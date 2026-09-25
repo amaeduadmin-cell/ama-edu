@@ -26,7 +26,8 @@ export default async function render({ outlet }) {
     }));
   }
 
-  const state = { tab: "site", settings: null, payments: null, posts: [] };
+  const requestedTab = new URLSearchParams(window.location.search).get("tab");
+  const state = { tab: TABS.some(([key]) => key === requestedTab) ? requestedTab : "site", settings: null, payments: null, posts: [] };
   const body = h("div.u-stack");
   mount(outlet, page({ title: "Public website", subtitle: "What visitors see at amaedu.com.ng.", body }));
   mount(body, skeleton(6));

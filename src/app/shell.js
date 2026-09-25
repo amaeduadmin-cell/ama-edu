@@ -49,6 +49,7 @@ const NAV_BY_ROLE = {
     ["/salary",          "Staff salaries", "Money"],
     ["/import",        "Bulk import",    "School"],
     ["/settings",      "Settings",       "School"],
+    ["/api-access",    "API & integrations", "School"],
     ["/academic-settings", "Academic settings", "School"],
   ],
   headmaster: [

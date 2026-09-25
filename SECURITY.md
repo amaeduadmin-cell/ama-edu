@@ -13,6 +13,8 @@
 - Public `/privacy`, `/terms`, and `/acceptable-use` pages document platform, school, and user responsibilities without exposing tenant data.
 - Score revisions are database-created after score inserts/updates and cannot be edited by authenticated clients. Correction requests are tenant-scoped, require a staff requester, and administrator approval writes the replacement through a SECURITY DEFINER RPC plus audit event.
 - Offline score entry stores only bounded pending score batches in browser local storage, never service-role credentials or private API responses. Queued batches are retried after connectivity returns and remain subject to the same RLS, score validation, lock, and period-window rules when synced.
+- Public API keys are stored only as SHA-256 hashes, carry explicit scopes, are revocable, and are rate-limited through a forced-RLS request window. The public API Edge Function resolves the school from the key and never trusts a caller-supplied school ID.
+- Webhook integrations require HTTPS, queue notification deliveries through a forced-RLS table, and use signed outbound requests from a trusted dispatcher. Cloudflare remains the outer WAF/rate-limit layer; service-role and webhook-signing secrets are never sent to browsers.
 
 ## Required test cases
 

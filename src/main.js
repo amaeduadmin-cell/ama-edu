@@ -132,6 +132,7 @@ function registerTenantRoutes() {
   register("/bulk-score-import", page("bulk-score-import"), staff);
   register("/score-control",   page("score-control"),   { requires: "admin" });
   register("/corrections",     page("corrections"),     { requires: "admin" });
+  register("/api-access",      page("api-access"),      { requires: "admin" });
   register("/notifications",   page("notifications"),   staff);
   register("/students",        page("students"),       staff);
   register("/student-operations", page("student-operations"), staff);

@@ -1,0 +1,16 @@
+# Maintenance and status
+
+Migration `0048_platform_operations_and_billing_foundations.sql` provides `platform_maintenance` and `platform_service_status` with platform-admin-only writes and public read RPCs:
+
+- `/maintenance` renders the current maintenance message and end time.
+- `/status` renders service-by-service status and last-checked timestamps.
+
+The database state is suitable for an edge-level maintenance interceptor, but Cloudflare interception still needs to be configured in the production account. Application routes should remain available for platform-admin bypass and status visibility.
+
+## Recovery baseline
+
+- Supabase database backups and point-in-time recovery should be enabled in the project plan.
+- Keep migration files and deployment configuration in GitHub.
+- Store gateway, email, and provider secrets in Supabase/Cloudflare secret stores, never in Git.
+- Test restoring a non-production project from a recent backup before changing production schema.
+- Record DNS, wildcard TLS, Cloudflare routes, Supabase project ID, and required environment variables in the deployment runbook.

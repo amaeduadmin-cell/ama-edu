@@ -90,6 +90,8 @@ function registerPlatformRoutes() {
   register("/find-school",      () => import("./pages/find-school.js"));
   register("/schools/:slug",    () => import("./pages/school-profile.js"));
   register("/verify/:code",     () => import("./pages/verify-report.js"));
+  register("/status",           () => import("./pages/status.js"));
+  register("/maintenance",      () => import("./pages/maintenance.js"));
   register("/blog",             () => import("./pages/blog.js"));
   register("/blog/:slug",       () => import("./pages/blog.js"));
   register("/reset-password",   () => import("./pages/reset-password.js"));
@@ -98,6 +100,7 @@ function registerPlatformRoutes() {
   register("/admin/applications", () => import("./app/platform/applications.js"), { requires: "platform" });
   register("/admin/schools/:id",() => import("./app/platform/school-detail.js"), { requires: "platform" });
   register("/admin/content",    () => import("./app/platform/content.js"), { requires: "platform" });
+  register("/admin/operations", () => import("./app/platform/operations.js"), { requires: "platform" });
   setNotFound(() => import("./pages/not-found.js"));
 
   setGuard(async (path) => {

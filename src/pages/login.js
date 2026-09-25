@@ -2,7 +2,7 @@
 
 import "../styles/marketing.css";
 import { h, mount, setBusy, safeUrl } from "../lib/dom.js";
-import { field, passwordField, inlineAlert } from "../lib/ui.js";
+import { field, passwordField, inlineAlert, footerNote } from "../lib/ui.js";
 import { signIn } from "../lib/auth.js";
 import { supabase } from "../lib/supabase.js";
 import { humanError, logError } from "../lib/errors.js";
@@ -37,8 +37,7 @@ export default async function render({ outlet }) {
         ),
         mode === "staff" ? staffForm() : studentForm(),
       ),
-      h("div.panel-foot", {},
-        h("div", { text: "Copyright © AMAEdu 2026 All Rights Reserved!" })),
+      footerNote(school?.name || "AMA EDU"),
     );
   }
 

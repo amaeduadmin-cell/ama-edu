@@ -12,6 +12,7 @@ import { supabase } from "../lib/supabase.js";
 import { logError } from "../lib/errors.js";
 import { setSeo, jsonLd } from "../lib/seo.js";
 import { tenantUrl } from "../lib/tenant.js";
+import { footerNote } from "../lib/ui.js";
 
 const TYPE_LABEL = {
   nursery_primary: "Nursery & Primary school",
@@ -92,7 +93,7 @@ export default async function render({ outlet, params }) {
           school.website ? h("li", {}, h("a", { href: safeUrl(school.website) || "#", rel: "noopener", text: school.website })) : null,
         ),
       ),
-      h("footer.mk-foot", {}, h("p.u-xs.u-muted", { text: "Powered by AMA EDU" })),
+      footerNote(school.name),
     ),
   );
 }

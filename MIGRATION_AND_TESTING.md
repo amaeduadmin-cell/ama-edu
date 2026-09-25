@@ -84,3 +84,9 @@ Platform administrators can edit the public founder section under **AMA EDU admi
 Migration `0047_registration_location_and_gateway_controls.sql` adds ward, LGA, state, country, school website, registration number, administrator phone, and additional information to the public school application flow. Approved applications carry the location and registration details into the provisioned `schools` row.
 
 The platform payment settings screen now has an explicit **Payment gateway connected and available** switch. Disabling and saving it records the disconnect time and lets the platform stop using gateway payments without deleting the configuration. Publishable keys may be stored for browser checkout; gateway secret keys must be configured as Supabase Edge Function secrets and are never stored in Postgres or sent to the frontend.
+
+## Platform operations and billing foundations
+
+Migration `0048_platform_operations_and_billing_foundations.sql` adds separate AMA EDU billing tables for plans, school subscriptions, historical invoices, invoice items, invoice payments, provider events, usage snapshots, and alerts. These tables are protected by platform-admin policies, with school members able to read only their own subscription, invoice, and usage records. Historical invoices preserve the student snapshot and line-item amounts used at creation; they are not recalculated from current enrolment.
+
+The same migration adds platform maintenance state and service status tables with public read-only RPCs. The public routes `/maintenance` and `/status` render those records without exposing administrative tables. Writes remain platform-admin-only. The shared portal footer now renders the current year, school name, and the exact required link text **Powered by AmaEdu Digital Solutions**.

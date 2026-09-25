@@ -142,9 +142,11 @@ export function passwordField({ label, id, autocomplete = "current-password", hi
   return { input, node: field({ label, id, hint, control: h("div.pw-wrap", {}, input, toggle) }) };
 }
 
-export function footerNote() {
+export function footerNote(schoolName = "AMA EDU") {
+  const year = new Date().getFullYear();
   return h("footer.app-footer.no-print", {},
-    h("div", { text: "Copyright © AMAEdu 2026 All Rights Reserved!" }));
+    h("div", {}, `© ${year} ${schoolName}. All Rights Reserved. `,
+      "Powered by ", h("a", { href: "https://amaedu.com.ng", target: "_blank", rel: "noopener", text: "AmaEdu Digital Solutions" })));
 }
 
 export { mount };

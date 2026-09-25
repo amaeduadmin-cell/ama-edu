@@ -141,6 +141,7 @@ const PLATFORM_NAV = [
   ["/admin/schools", "Schools",        "Platform"],
   ["/admin/applications", "Applications", "Platform"],
   ["/admin/content", "Public website", "Platform"],
+  ["/admin/operations", "Operations", "Platform"],
 ];
 
 export function navForSession() {
@@ -201,7 +202,7 @@ export function page({ title, subtitle, actions = [], body }) {
           : null,
         body,
       ),
-      footerNote(),
+    footerNote(context.school?.name || "AMA EDU"),
     ),
   );
 }

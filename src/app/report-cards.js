@@ -13,7 +13,7 @@ import { page, requireRole } from "./shell.js";
 import { supabase } from "../lib/supabase.js";
 import { unwrap, humanError, logError } from "../lib/errors.js";
 import { emptyState, errorState } from "../lib/ui.js";
-import { fetchClasses, fetchActiveTerm } from "../lib/data.js";
+import { fetchClasses, fetchActiveTerm, fetchSessionTermAverages, fetchHeadSignatory, fetchVerificationCode } from "../lib/data.js";
 import { renderReportCard, loadReportCardContext } from "../lib/reportcard.js";
 import { context } from "../main.js";
 
@@ -67,7 +67,7 @@ export default async function render({ outlet }) {
     const host = document.getElementById("reportHost");
     try {
       state.students = unwrap(
-        await supabase.from("students").select("id, full_name, admission_no").eq("class_id", state.classId).eq("is_active", true).order("full_name"),
+        await supabase.from("students").select("id, full_name, admission_no, photo_url, gender, date_of_birth").eq("class_id", state.classId).eq("is_active", true).order("full_name"),
         "fetch students"
       );
       renderPicker(host);
@@ -105,12 +105,27 @@ export default async function render({ outlet }) {
         unwrap(await supabase.from("student_scores").select("ca1,ca2,ca3,exam,total,grade,subject_position,subjects(name)").eq("student_id", state.studentId).eq("term_id", state.term.id).eq("is_offered", true), "fetch scores"),
         unwrap(await supabase.from("student_term_summary").select("*").eq("student_id", state.studentId).eq("term_id", state.term.id).limit(1), "fetch summary"),
       ]);
+
+      // Template 4 only: the annual-summary row, the role-mapped
+      // Headmaster/Principal signature, and the QR verification code.
+      // Skipped for other templates so switching template doesn't add
+      // extra round-trips nobody asked for.
+      let sessionSummaries = null, headSignatory = null, verificationCode = null;
+      if (context.school?.report_card_template === "pariya") {
+        [sessionSummaries, headSignatory, verificationCode] = await Promise.all([
+          fetchSessionTermAverages(state.studentId, state.term.session_id),
+          fetchHeadSignatory(klass?.category, context.school),
+          fetchVerificationCode(state.studentId, state.term.id),
+        ]);
+      }
+
       mount(preview, renderReportCard({
         school: context.school, student, class: klass, term: state.term,
         scores, summary: summaryRows?.[0] || null, weights: state.weights,
         template: context.school?.report_card_template,
         components: state.rc.components, bands: state.rc.bands,
         remarks: state.rc.remarks, settings: state.rc.settings,
+        sessionSummaries, headSignatory, verificationCode,
       }));
     } catch (err) {
       logError("load report", err);

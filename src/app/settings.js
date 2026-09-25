@@ -30,7 +30,7 @@ export default async function render({ outlet }) {
     try {
       const [school, terms] = await Promise.all([
         unwrap(await supabase.from("schools").select("*").eq("id", session.schoolId).single(), "fetch school"),
-        unwrap(await supabase.from("terms").select("id, label, order_index, is_active, sessions(label)").order("order_index"), "fetch terms"),
+        unwrap(await supabase.from("terms").select("id, label, order_index, is_active, ends_on, next_term_starts_on, sessions(label)").order("order_index"), "fetch terms"),
       ]);
       mount(body,
         generalCard(school),
@@ -153,9 +153,41 @@ function academicCard(terms) {
         setBusy(btn, false);
       }
     });
-    return h("div.u-row", { style: { justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid var(--ama-line-2)" } },
-      h("div", {}, h("div", { style: { fontWeight: "600" }, text: `${term.label} Term` }), h("div.u-xs.u-muted", { text: term.sessions?.label || "" })),
-      term.is_active ? h("span.badge.badge-ok", { text: "Active" }) : btn,
+
+    // "Closing date" / "resumption date" — reuses terms.ends_on and
+    // terms.next_term_starts_on rather than adding new columns; the
+    // report card's holiday-duration line is computed from these two.
+    const closingInput = h("input.input", { type: "date", value: term.ends_on || "" });
+    const resumptionInput = h("input.input", { type: "date", value: term.next_term_starts_on || "" });
+    const datesErrorSlot = h("div");
+    const datesSaveBtn = h("button.btn.btn-outline.btn-sm", { type: "button", text: "Save dates" });
+    datesSaveBtn.addEventListener("click", async () => {
+      mount(datesErrorSlot);
+      setBusy(datesSaveBtn, true, "Saving…");
+      try {
+        unwrap(await supabase.from("terms").update({
+          ends_on: closingInput.value || null,
+          next_term_starts_on: resumptionInput.value || null,
+        }).eq("id", term.id), "save term dates");
+        term.ends_on = closingInput.value || null;
+        term.next_term_starts_on = resumptionInput.value || null;
+        toastOk(`${term.label} Term dates saved`);
+      } catch (err) {
+        mount(datesErrorSlot, inlineAlert(humanError(err)));
+      } finally { setBusy(datesSaveBtn, false); }
+    });
+
+    return h("div", { style: { padding: "10px 0", borderBottom: "1px solid var(--ama-line-2)" } },
+      h("div.u-row", { style: { justifyContent: "space-between" } },
+        h("div", {}, h("div", { style: { fontWeight: "600" }, text: `${term.label} Term` }), h("div.u-xs.u-muted", { text: term.sessions?.label || "" })),
+        term.is_active ? h("span.badge.badge-ok", { text: "Active" }) : btn,
+      ),
+      datesErrorSlot,
+      h("div.form-grid.cols-2", { style: { marginTop: "8px" } },
+        field({ label: "Closing date", id: `closing-${term.id}`, control: closingInput }),
+        field({ label: "Resumption date", id: `resumption-${term.id}`, control: resumptionInput }),
+      ),
+      h("div.u-row", { style: { justifyContent: "flex-end", marginTop: "4px" } }, datesSaveBtn),
     );
   }
 }

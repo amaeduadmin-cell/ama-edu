@@ -14,7 +14,7 @@ import { page, requireRole } from "./shell.js";
 import { supabase } from "../lib/supabase.js";
 import { unwrap, humanError, logError } from "../lib/errors.js";
 import { emptyState, errorState, inlineAlert } from "../lib/ui.js";
-import { fetchActiveTerm } from "../lib/data.js";
+import { fetchActiveTerm, fetchSessionTermAverages, fetchHeadSignatory, fetchVerificationCode } from "../lib/data.js";
 import { renderReportCard, loadReportCardContext } from "../lib/reportcard.js";
 import { session } from "../lib/auth.js";
 import { context } from "../main.js";
@@ -37,7 +37,7 @@ export default async function render({ outlet }) {
     // reason only, never a score. Without this the student would just see an
     // empty table and assume the portal was broken.
     const [student, availRows, rc] = await Promise.all([
-      unwrap(await supabase.from("students").select("id, full_name, admission_no, classes(id, name)").eq("id", session.studentId).single(), "fetch my record"),
+      unwrap(await supabase.from("students").select("id, full_name, admission_no, photo_url, gender, date_of_birth, classes(id, name, category)").eq("id", session.studentId).single(), "fetch my record"),
       unwrap(await supabase.rpc("my_result_availability", { p_student_id: session.studentId, p_term_id: term.id }), "result availability"),
       loadReportCardContext(supabase, unwrap),
     ]);
@@ -59,6 +59,15 @@ export default async function render({ outlet }) {
       return mount(body, emptyState({ title: "No scores published yet", body: "Check back once your teachers have entered this term's scores." }));
     }
 
+    let sessionSummaries = null, headSignatory = null, verificationCode = null;
+    if (context.school?.report_card_template === "pariya") {
+      [sessionSummaries, headSignatory, verificationCode] = await Promise.all([
+        fetchSessionTermAverages(session.studentId, term.session_id),
+        fetchHeadSignatory(student.classes?.category, context.school),
+        fetchVerificationCode(session.studentId, term.id),
+      ]);
+    }
+
     mount(body,
       h("div.no-print.u-row", { style: { justifyContent: "flex-end", marginBottom: "12px" } },
         h("button.btn.btn-outline.btn-sm", { type: "button", text: "Print", onclick: () => window.print() })),
@@ -68,6 +77,7 @@ export default async function render({ outlet }) {
         weights: rc.weights || { ca1_max: 20, ca2_max: 20, ca3_max: 20, exam_max: 40 },
         template: context.school?.report_card_template,
         components: rc.components, bands: rc.bands, remarks: rc.remarks, settings: rc.settings,
+        sessionSummaries, headSignatory, verificationCode,
       }),
     );
   } catch (err) {

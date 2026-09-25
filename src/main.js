@@ -89,6 +89,7 @@ function registerPlatformRoutes() {
   register("/login",            () => import("./pages/platform-login.js"));
   register("/find-school",      () => import("./pages/find-school.js"));
   register("/schools/:slug",    () => import("./pages/school-profile.js"));
+  register("/verify/:code",     () => import("./pages/verify-report.js"));
   register("/blog",             () => import("./pages/blog.js"));
   register("/blog/:slug",       () => import("./pages/blog.js"));
   register("/reset-password",   () => import("./pages/reset-password.js"));

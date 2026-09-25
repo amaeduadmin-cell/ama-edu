@@ -4,8 +4,9 @@ Migration `0048_platform_operations_and_billing_foundations.sql` provides `platf
 
 - `/maintenance` renders the current maintenance message and end time.
 - `/status` renders service-by-service status and last-checked timestamps.
+- The platform bootstrap reads the public RPC before rendering routes. An active `global` or `public` window redirects visitors to `/maintenance`; `/maintenance` and `/status` remain available, and signed-in platform admins retain bypass access.
 
-The database state is suitable for an edge-level maintenance interceptor, but Cloudflare interception still needs to be configured in the production account. Application routes should remain available for platform-admin bypass and status visibility.
+The application-level interceptor is active. A Cloudflare edge-level interceptor is still recommended as a defense-in-depth layer for outages that prevent the JavaScript bundle from loading. Application routes remain available for platform-admin bypass and status visibility.
 
 ## Monitoring and disaster recovery
 

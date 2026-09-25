@@ -20,7 +20,7 @@ import { getCurrentTenantSlug, fetchTenantConfig, applyTenantBranding } from "./
 import { register, setNotFound, setGuard, start, navigate } from "./lib/router.js";
 import { loadSession, session, hasRole, onSessionChange } from "./lib/auth.js";
 import { startRealtime, stopRealtime } from "./lib/realtime.js";
-import { hasConfig } from "./lib/supabase.js";
+import { hasConfig, supabase } from "./lib/supabase.js";
 import { logError } from "./lib/errors.js";
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -31,6 +31,24 @@ export const context = {
   school: null,
   isPlatform: true,
 };
+
+const maintenanceExemptPaths = new Set(["/maintenance", "/status"]);
+
+/** Read the public maintenance switch without exposing the table itself. */
+async function activePlatformMaintenance(path) {
+  if (!context.isPlatform || maintenanceExemptPaths.has(path)) return null;
+  try {
+    const { data, error } = await supabase.rpc("public_platform_maintenance");
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.enabled || !["global", "public"].includes(row.scope)) return null;
+    return row;
+  } catch (err) {
+    // A maintenance read failure must not take the whole site offline.
+    logError("maintenance check", err);
+    return null;
+  }
+}
 
 /* Restore the user's light/dark choice before first paint of the app. */
 (function initTheme() {
@@ -109,8 +127,12 @@ function registerPlatformRoutes() {
   setNotFound(() => import("./pages/not-found.js"));
 
   setGuard(async (path) => {
-    if (!path.startsWith("/admin")) return null;
     if (!session.ready) await loadSession();
+    if (!session.isPlatformAdmin) {
+      const maintenance = await activePlatformMaintenance(path);
+      if (maintenance) return "/maintenance";
+    }
+    if (!path.startsWith("/admin")) return null;
     if (!session.authed) return "/login";
     if (!session.isPlatformAdmin) return "/unauthorized";
     return null;

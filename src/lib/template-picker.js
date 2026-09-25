@@ -27,6 +27,11 @@ export const TEMPLATES = [
     name: "Template 3 — Heritage",
     blurb: "A bordered three-column info box, a banner-style title and a bottom signatures row, in the classic Nigerian report-sheet look.",
   },
+  {
+    code: "pariya",
+    name: "Template 4 — Pariya Classic",
+    blurb: "The original Pariya report sheet layout: brown-bordered header, green term banner, annual/session summary box and a scannable QR verification code.",
+  },
 ];
 
 export function previewTemplate(code, { school, components } = {}) {

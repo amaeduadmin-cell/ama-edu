@@ -8,6 +8,10 @@
      heritage  Template 3: bordered three-column info box, pill
                banners and a signatures row — ported from the
                original MyPAS1 report-sheet design (newpariyacentral).
+     pariya    Template 4: exact port of newpariyacentral's own
+               Pariya Classic layout (its behaviour, not its client-
+               side privilege model) — adds an annual/session summary
+               box and a QR verification code Templates 1-3 don't have.
 
    Which one is drawn comes from schools.report_card_template, so a
    school can switch design without touching a single stored result —
@@ -19,6 +23,8 @@
    =============================================================== */
 
 import { h, safeUrl } from "./dom.js";
+import { qrSvg } from "./qrcode.js";
+import { platformUrl } from "./tenant.js";
 
 /**
  * data: {
@@ -32,6 +38,7 @@ export function renderReportCard(data) {
   const template = data.template || data.school?.report_card_template || "classic";
   if (template === "compact") return compactCard(data);
   if (template === "heritage") return richCard(data);
+  if (template === "pariya") return pariyaCard(data);
   return classicCard(data);
 }
 
@@ -358,7 +365,227 @@ function rc3Signature(label, name) {
     name ? h("div.rc3-sign-name", { text: name }) : null);
 }
 
-/* ---------------- helpers ---------------- */
+/* ---------------- Template 4: Pariya Classic (rc-pariya) ---------------- */
+/* Exact port of newpariyacentral's buildReportCardHtml() markup, colours
+   and layout — see styles/reportcard.css for why every class name is
+   renamed rc4-... / rc-pariya rather than pasted verbatim (the source doc's
+   .card collides with this app's own site-wide card component). Adds
+   three things Templates 1-3 don't have: term dates -> holiday duration
+   (migration 0033, reusing terms.ends_on/next_term_starts_on), the
+   annual/session summary box (migrations 0034-0035), and a scannable QR
+   verification block (migration 0036).
+
+   Extra optional fields this template reads, beyond the shared `data`
+   shape (fetched by the calling page only when template === "pariya"):
+     data.sessionSummaries  [{ label, average_score }] — 1st/2nd/3rd
+                             term averages for the annual-summary row.
+     data.headSignatory     { label, name, signature_url } — role-
+                             mapped Headmaster/Principal lookup.
+     data.verificationCode  string | null — from
+                             get_or_create_report_verification(); when
+                             null (e.g. template previews) the QR block
+                             is simply omitted rather than faked. */
+
+const CATEGORY_LABEL = {
+  nursery: "Nursery", primary: "Primary", jss: "Junior Secondary",
+  ss: "Senior Secondary", islamiyya: "Islamiyya", other: "",
+};
+
+function pariyaCard(data) {
+  const { school, student, class: klass, term, summary, settings, sessionSummaries, headSignatory, verificationCode } = data;
+  const components = activeComponents(data);
+  const { scores } = data;
+  const showPositions = settings?.show_positions !== false;
+
+  const logo = safeUrl(school?.logo_url);
+  const photo = settings?.show_photo === false ? null : safeUrl(student?.photo_url);
+  const contact = [
+    school?.phone ? `☎ ${school.phone}` : null,
+    school?.email ? `✉ ${school.email}` : null,
+    school?.website ? `🌐 ${school.website}` : null,
+  ].filter(Boolean);
+
+  const category = klass?.category;
+  const categoryLabel = CATEGORY_LABEL[category] || "";
+  const wantsPrincipal = category === "jss" || category === "ss";
+  const headLabel = headSignatory?.label || (wantsPrincipal ? "Principal" : "Headmaster");
+  const headName = headSignatory?.name || (wantsPrincipal ? school?.principal_name : school?.headmaster_name);
+  const headSig = safeUrl(headSignatory?.signature_url);
+
+  const colCount = 2 + components.length + 2 + (showPositions ? 1 : 0) + 1;
+
+  return h("article.report-card.rc-pariya", {},
+    h("div.rc4-header", {},
+      h("div.rc4-logo-box", {}, logo
+        ? h("img", { src: logo, alt: "" })
+        : h("div.rc4-crest-fallback", { "aria-hidden": "true", text: (school?.name || "AE").slice(0, 1).toUpperCase() })),
+      h("div.rc4-title-block", {},
+        h("h2", { text: school?.name || "Your School Name" }),
+        school?.address ? h("p.rc4-address", { text: school.address }) : null,
+        contact.length ? h("div.rc4-contact", {}, contact.map((t) => h("span", { text: t }))) : null,
+      ),
+      h("div.rc4-photo-box", {}, photo ? h("img", { src: photo, alt: "" }) : null),
+    ),
+    school?.motto ? h("div.rc4-motto", { text: school.motto }) : null,
+    h("hr.rc4-divider"),
+
+    h("div.rc4-banner-wrap", {},
+      h("span.rc4-banner", { text: `${term?.label ? term.label + " Term " : ""}Report Sheet`.toUpperCase() })),
+
+    h("div.rc4-infobox", {},
+      h("div.rc4-info-cols", {},
+        h("div.rc4-info-col-left", {},
+          rc4Line("Name", student?.full_name),
+          rc4Line("Total score", fmt(summary?.total_score)),
+          rc4Line("Average", summary?.average_score != null ? `${fmt(summary.average_score)}%` : "—"),
+          rc4Line("Grade", summary?.overall_grade),
+          rc4Line("Position", summary ? `${ordinal(summary.class_position)} of ${summary.class_size ?? "—"}` : "—"),
+        ),
+        h("div.rc4-info-col-mid", {},
+          rc4Line("Gender", student?.gender ? capitalize(student.gender) : "—"),
+          rc4Line("Admission no.", student?.admission_no),
+          rc4Line("Class", klass?.name),
+          rc4Line("Class size", summary?.class_size),
+          rc4Line("Term", term?.label ? `${term.label} Term` : "—"),
+        ),
+        h("div.rc4-info-col-right", {},
+          rc4Line("Session", term?.sessions?.label),
+          rc4Line("Date of birth", formatDob(student?.date_of_birth)),
+          rc4Line("Closing date", formatDate(term?.ends_on)),
+          rc4Line("Resumption date", formatDate(term?.next_term_starts_on)),
+          rc4Line("Holiday duration", holidayDuration(term?.ends_on, term?.next_term_starts_on)),
+        ),
+      ),
+    ),
+
+    h("div.rc4-perf-banner", { text: `Student's Academic Performance${categoryLabel ? ` (${categoryLabel} Category)` : ""}` }),
+    h("table.rc4-table", {},
+      h("thead", {}, h("tr", {},
+        h("th", { text: "S/N" }),
+        h("th", { text: "Subject" }),
+        components.map((c) => h("th", { text: `${c.label} /${fmt(c.max_score)}` })),
+        h("th", { text: "Total" }),
+        h("th", { text: "Grade" }),
+        showPositions ? h("th", { text: "Position" }) : null,
+        h("th", { text: "Remark" }),
+      )),
+      h("tbody", {}, scores?.length
+        ? scores.map((s, i) => h("tr", {},
+            h("td", { text: String(i + 1) }),
+            h("td", { text: subjectName(s) }),
+            components.map((c) => h("td", { text: fmt(s[c.code]) })),
+            h("td", { text: fmt(s.total) }),
+            h("td", { text: s.grade || "—" }),
+            showPositions ? h("td", { text: ordinal(s.subject_position) }) : null,
+            h("td", { text: s.remark || remarkFor(data, s.total) || "—" }),
+          ))
+        : [emptyRow(colCount)]),
+    ),
+
+    sessionSummaries?.length || summary?.annual_average != null ? annualSummaryBox(data) : null,
+
+    h("div.rc4-remarks-box", {},
+      summary?.teacher_remark
+        ? h("div.rc4-remark-line", {}, h("span.rc4-label", { text: "Class teacher's remark: " }), summary.teacher_remark) : null,
+      summary?.head_remark
+        ? h("div.rc4-remark-line", {}, h("span.rc4-label", { text: "Head's remark: " }), summary.head_remark) : null,
+      summary?.annual_average != null
+        ? h("div.rc4-remark-line", {}, h("span.rc4-label", { text: "Annual remark: " }), annualRemark(data)) : null,
+      (!summary?.teacher_remark && !summary?.head_remark && summary?.annual_average == null)
+        ? h("div.rc4-remark-line.rc4-muted", { text: "No remarks recorded for this term." }) : null,
+    ),
+
+    h("div.rc4-bottom-row", {},
+      rc4Signature("Admin Officer"),
+      h("div.rc4-mid-col", {},
+        verificationCode
+          ? qrSvg(platformUrl(`/verify/${verificationCode}`), { size: 78, label: "Report card verification QR code" })
+          : h("div.rc4-seal-box", { text: "SCHOOL SEAL" }),
+        verificationCode ? h("div.u-xs.u-muted", { text: verificationCode }) : null,
+      ),
+      rc4Signature(headLabel, headName, headSig),
+    ),
+    gradeKey(data),
+  );
+}
+
+function annualSummaryBox(data) {
+  const { summary, sessionSummaries } = data;
+  const terms = sessionSummaries?.length ? sessionSummaries : [];
+  return h("div.rc4-annual-box", {},
+    h("div.rc4-annual-title", { text: "Annual / Session Summary" }),
+    h("table", {},
+      h("thead", {}, h("tr", {},
+        terms.map((t) => h("th", { text: `${t.label} Avg` })),
+        h("th", { text: "Annual Avg" }),
+        h("th", { text: "Annual Grade" }),
+        h("th", { text: "Annual Position" }),
+      )),
+      h("tbody", {}, h("tr", {},
+        terms.map((t) => h("td", { text: t.average_score != null ? `${fmt(t.average_score)}%` : "—" })),
+        h("td", { text: summary?.annual_average != null ? `${fmt(summary.annual_average)}%` : "—" }),
+        h("td", { text: summary?.annual_grade || "—" }),
+        h("td", { text: summary?.annual_position_label || "—" }),
+      )),
+    ),
+  );
+}
+
+/** Default annual remark keyed off the annual grade, reusing each
+ *  school's own configured grading_bands.remark rather than a separate
+ *  hardcoded string or a brand-new editable field — the band's remark
+ *  is exactly "what this grade means" already, wherever else it's used. */
+function annualRemark(data) {
+  const grade = data.summary?.annual_grade;
+  if (!grade || !data.bands?.length) return "—";
+  const band = data.bands.find((b) => b.grade === grade);
+  return band?.remark || "—";
+}
+
+function rc4Line(label, value) {
+  return h("div.rc4-info-line", {},
+    h("span.rc4-label", { text: label }),
+    h("span.rc4-value", { text: (value === null || value === undefined || value === "") ? "—" : String(value) }));
+}
+
+function rc4Signature(label, name, signatureUrl) {
+  return h("div.rc4-sign", {},
+    signatureUrl ? h("img.rc4-sig-img", { src: signatureUrl, alt: "" }) : null,
+    h("div.rc4-sign-line", { "aria-hidden": "true" }),
+    h("div.rc4-sign-label", { text: label }),
+    name ? h("div.rc4-sign-name", { text: name }) : null);
+}
+
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+function formatDate(d) {
+  if (!d) return "—";
+  const dt = new Date(d + "T00:00:00");
+  if (Number.isNaN(dt.getTime())) return "—";
+  return dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatDob(d) {
+  if (!d) return "—";
+  const dob = new Date(d + "T00:00:00");
+  if (Number.isNaN(dob.getTime())) return "—";
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) age--;
+  return `${formatDate(d)} (${age} yrs)`;
+}
+
+/** Whole days between a term's closing date and the next term's
+ *  resumption date; "—" if either is missing, per spec. */
+function holidayDuration(endsOn, resumesOn) {
+  if (!endsOn || !resumesOn) return "—";
+  const a = new Date(endsOn + "T00:00:00");
+  const b = new Date(resumesOn + "T00:00:00");
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return "—";
+  const days = Math.round((b - a) / (1000 * 60 * 60 * 24));
+  return days >= 0 ? `${days} day${days === 1 ? "" : "s"}` : "—";
+}
 
 function subjectName(s) { return s.subjects?.name || s.subject_name || "—"; }
 
@@ -447,9 +674,9 @@ export function sampleReportCardData({ school, components, template } = {}) {
       logo_url: school?.logo_url || null,
       report_card_template: template || school?.report_card_template || "classic",
     },
-    student: { full_name: "Sample Student", admission_no: "ADM/0001", photo_url: null },
-    class: { name: "Primary 5" },
-    term: { label: "First", sessions: { label: "2026/2027" } },
+    student: { full_name: "Sample Student", admission_no: "ADM/0001", photo_url: null, gender: "female", date_of_birth: "2015-03-14" },
+    class: { name: "Primary 5", category: "primary" },
+    term: { label: "Third", sessions: { label: "2026/2027" }, ends_on: "2027-07-16", next_term_starts_on: "2027-09-09" },
     scores,
     summary: {
       subjects_count: scores.length,
@@ -459,7 +686,19 @@ export function sampleReportCardData({ school, components, template } = {}) {
       class_position: 3, class_size: 32, days_present: 58, days_absent: 3,
       teacher_remark: "A hardworking pupil who participates well in class.",
       head_remark: "Keep up the good work.",
+      annual_average: Math.round((average - 1.5) * 10) / 10,
+      annual_grade: average >= 70 ? "A" : average >= 60 ? "B" : "C",
+      annual_position_label: "4th of 32",
     },
+    sessionSummaries: [
+      { label: "First", average_score: Math.round((average - 3) * 10) / 10 },
+      { label: "Second", average_score: Math.round((average - 1) * 10) / 10 },
+      { label: "Third", average_score: Math.round(average * 10) / 10 },
+    ],
+    headSignatory: { label: "Headmaster", name: school?.headmaster_name || "Headmaster's name", signature_url: null },
+    // A fixed, obviously-fake code — previews never call the real
+    // verification RPC, so this never touches report_card_verifications.
+    verificationCode: template === "pariya" ? "SAMPLE01" : null,
     components: comps,
     remarks: [
       { min_score: 70, max_score: 100, remark: "Very good" },

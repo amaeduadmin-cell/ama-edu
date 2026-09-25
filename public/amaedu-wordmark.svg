@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="348" height="72" viewBox="0 0 348 72" role="img" aria-labelledby="title desc">
+  <title id="title">AMA EDU</title>
+  <desc id="desc">AMA EDU wordmark with a green A mark and brass offset shadow.</desc>
+  <g transform="translate(4 4)">
+    <rect x="4" y="4" width="56" height="56" rx="18" fill="#b8862b"/>
+    <rect x="0" y="0" width="56" height="56" rx="18" fill="#0a4e2e"/>
+    <path d="M 0 56 H 18 Q 0 56 0 38 Z" fill="#0a4e2e"/>
+    <text x="28" y="38" text-anchor="middle" fill="#f9f4e8" font-family="Public Sans, Arial, sans-serif" font-size="30" font-weight="800">A</text>
+  </g>
+  <text x="72" y="46" fill="#12211b" font-family="Fraunces, Iowan Old Style, Georgia, serif" font-size="39" font-weight="600" letter-spacing="-1.35">AMA</text>
+  <text x="171" y="46" fill="#0f6b3f" font-family="Fraunces, Iowan Old Style, Georgia, serif" font-size="39" font-weight="600" letter-spacing="-1.35">EDU</text>
+</svg>

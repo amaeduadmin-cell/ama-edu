@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.billing-automation]
 verify_jwt = false
+
+[functions.data-export]
+verify_jwt = true

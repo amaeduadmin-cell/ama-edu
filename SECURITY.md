@@ -8,6 +8,9 @@
 - DOM rendering uses text content and safe URL validation to reduce stored-XSS risk.
 - Payment gateway secret keys are never stored in Postgres or exposed to the browser; only publishable keys may be configured in platform settings.
 - Academic operations and configuration changes write audit records through the existing audit layer.
+- Account Settings supports Supabase TOTP MFA enrollment, challenge verification, assurance display, and factor removal. TOTP secrets remain with Supabase Auth and are not stored by AMA EDU.
+- Data exports are admin-only and tenant-scoped, use forced RLS on export jobs, private Storage, and one-hour signed URLs. The export Edge Function re-checks the caller's school and role before reading any records.
+- Public `/privacy`, `/terms`, and `/acceptable-use` pages document platform, school, and user responsibilities without exposing tenant data.
 
 ## Required test cases
 

@@ -92,6 +92,9 @@ function registerPlatformRoutes() {
   register("/verify/:code",     () => import("./pages/verify-report.js"));
   register("/status",           () => import("./pages/status.js"));
   register("/maintenance",      () => import("./pages/maintenance.js"));
+  register("/privacy",          () => import("./pages/legal.js"));
+  register("/terms",            () => import("./pages/legal.js"));
+  register("/acceptable-use",   () => import("./pages/legal.js"));
   register("/blog",             () => import("./pages/blog.js"));
   register("/blog/:slug",       () => import("./pages/blog.js"));
   register("/reset-password",   () => import("./pages/reset-password.js"));

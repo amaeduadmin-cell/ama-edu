@@ -15,9 +15,10 @@ import { page, requireRole } from "./shell.js";
 import { supabase } from "../lib/supabase.js";
 import { unwrap, humanError, logError } from "../lib/errors.js";
 import { emptyState, errorState, field, passwordField, inlineAlert, confirmAction, toastOk, toastError } from "../lib/ui.js";
-import { hasRole, session, changeOwnPassword } from "../lib/auth.js";
+import { hasRole, session, changeOwnPassword, getMfaFactors, enrollMfa, verifyMfa, unenrollMfa } from "../lib/auth.js";
 import { applyTenantBranding } from "../lib/tenant.js";
 import { context } from "../main.js";
+import { invokeFunction } from "../lib/functions.js";
 
 export default async function render({ outlet }) {
   const isAdmin = hasRole("admin");
@@ -44,15 +45,75 @@ export default async function render({ outlet }) {
         sectionFeesCard(activeTerm, sectionFees),
         schoolPaymentCard(paymentRows?.[0] || {}),
         admissionCard(school),
-        passwordCard(),
+          passwordCard(),
+          securityCard(),
+          dataExportCard(),
       );
     } catch (err) {
       logError("settings boot", err);
       mount(body, errorState(humanError(err)));
     }
   } else {
-    mount(body, passwordCard());
+    mount(body, passwordCard(), securityCard());
   }
+}
+
+function dataExportCard() {
+  const scope = h("select.select", {}, [["school", "Whole school record"], ["students", "Students and families"], ["academic", "Academic records"], ["billing", "AMA EDU billing records"]].map(([value, label]) => h("option", { value, text: label })));
+  const format = h("select.select", {}, ["json", "csv"].map(value => h("option", { value, text: value.toUpperCase() })));
+  const note = h("div");
+  const button = h("button.btn.btn-outline", { type: "button", text: "Create secure export" });
+  button.onclick = async () => {
+    setBusy(button, true, "Preparing export…");
+    try {
+      const jobId = unwrap(await supabase.rpc("request_data_export", { p_scope: scope.value, p_format: format.value, p_school_id: session.schoolId }), "request export");
+      const result = await invokeFunction("data-export", { job_id: jobId });
+      if (result?.signed_url) window.open(result.signed_url, "_blank", "noopener");
+      mount(note, inlineAlert("Export ready. The private download link expires in one hour.", "info"));
+    } catch (err) { mount(note, inlineAlert(humanError(err))); } finally { setBusy(button, false); }
+  };
+  return h("section.card", {}, h("div.card-head", {}, h("div", {}, h("h2.card-title", { text: "Data export" }), h("div.card-sub", { text: "Create a private, expiring export for an approved school purpose." })), h("span.badge.badge-info", { text: "Admin" })), inlineAlert("Exports include only records belonging to this school. Download links expire after one hour and are not public.", "info"), h("div.form-grid.cols-2", {}, field({ label: "Scope", id: "exportScope", control: scope }), field({ label: "Format", id: "exportFormat", control: format })), note, button);
+}
+
+function securityCard() {
+  const body = h("div.u-stack", {}, h("p.u-muted", { text: "Loading account security…" }));
+  const card = h("section.card", {}, h("div.card-head", {}, h("div", {}, h("h2.card-title", { text: "Account security" }), h("div.card-sub", { text: "Protect administrator and staff accounts with an authenticator app." })), h("span.badge.badge-info", { text: "MFA" })), body);
+  refresh();
+  async function refresh() {
+    try {
+      const factors = await getMfaFactors();
+      const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      mount(body, factors.length ? factors.map(factor => enrolledFactor(factor, aal?.currentLevel)) : setupPrompt());
+    } catch (err) { mount(body, inlineAlert(humanError(err))); }
+  }
+  function setupPrompt() {
+    const note = h("div");
+    const start = h("button.btn.btn-primary", { type: "button", text: "Set up authenticator app" });
+    start.onclick = async () => {
+      setBusy(start, true, "Preparing…");
+      try {
+        const result = await enrollMfa();
+        const code = h("input.input", { inputmode: "numeric", autocomplete: "one-time-code", placeholder: "6-digit code" });
+        const verify = h("button.btn.btn-primary.btn-sm", { type: "button", text: "Verify and enable" });
+        verify.onclick = async () => {
+          setBusy(verify, true, "Verifying…");
+          try { await verifyMfa(result.id, code.value); toastOk("Multi-factor authentication enabled"); await refresh(); }
+          catch (err) { mount(note, inlineAlert(humanError(err))); } finally { setBusy(verify, false); }
+        };
+        mount(body, h("div.card", {}, h("p", { text: "Scan this QR code with Google Authenticator, Microsoft Authenticator, or another TOTP app, then enter the six-digit code." }), result.totp?.qr ? h("img", { src: result.totp.qr, alt: "Authenticator setup QR code", style: { width: "180px", height: "180px", background: "white", padding: "8px", borderRadius: "8px" } }) : null, result.totp?.secret ? h("p.u-xs.u-muted", { text: `Manual setup key: ${result.totp.secret}` }) : null, field({ label: "Authenticator code", id: "mfaCode", control: code }), note, verify));
+      } catch (err) { mount(note, inlineAlert(humanError(err))); } finally { setBusy(start, false); }
+    };
+    return h("div", {}, h("p", { text: "No authenticator factor is enrolled on this account." }), start, note);
+  }
+  function enrolledFactor(factor, level) {
+    const remove = h("button.btn.btn-outline.btn-sm", { type: "button", text: "Remove authenticator" });
+    remove.onclick = async () => {
+      setBusy(remove, true, "Removing…");
+      try { await unenrollMfa(factor.id); toastOk("Authenticator removed"); await refresh(); } catch (err) { toastError(humanError(err)); } finally { setBusy(remove, false); }
+    };
+    return h("div", {}, h("p", { text: `Authenticator enabled${factor.friendly_name ? `: ${factor.friendly_name}` : ""}. Current assurance: ${level || "unknown"}.` }), remove);
+  }
+  return card;
 }
 
 function schoolPaymentCard(existing) {

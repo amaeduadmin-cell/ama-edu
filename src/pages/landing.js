@@ -161,7 +161,7 @@ function siteFooter() {
     h("div.shell-width", {},
       h("div.site-foot-grid", {},
         h("div", {}, h("a.wordmark", { href: "/" }, h("span.wordmark-mark", { text: "A" }), h("span", {}, "AMA ", h("b", { text: "EDU" }))), h("div.u-xs.u-muted", { text: "School management for Nigerian schools" })),
-        h("nav", { "aria-label": "Footer" }, h("a", { href: "/register", text: "Register" }), h("a", { href: "/find-school", text: "Find my school" }), h("a", { href: "/login", text: "Platform sign in" })),
+        h("nav", { "aria-label": "Footer" }, h("a", { href: "/register", text: "Register" }), h("a", { href: "/find-school", text: "Find my school" }), h("a", { href: "/login", text: "Platform sign in" }), h("a", { href: "/privacy", text: "Privacy" }), h("a", { href: "/terms", text: "Terms" }), h("a", { href: "/acceptable-use", text: "Acceptable use" })),
       ),
       h("div.u-xs.u-muted.u-mt-6", {}, `© ${year} AMA EDU. All Rights Reserved. Powered by `, h("a", { href: "https://amaedu.com.ng", target: "_blank", rel: "noopener", text: "AmaEdu Digital Solutions" })),
     ),

@@ -193,6 +193,31 @@ export async function changeOwnPassword(newPassword) {
   if (error) { logError("changeOwnPassword", error); throw new AppError(humanError(error)); }
 }
 
+export async function getMfaFactors() {
+  const { data, error } = await supabase.auth.mfa.listFactors();
+  if (error) { logError("mfa.listFactors", error); throw new AppError(humanError(error)); }
+  return data?.totp || [];
+}
+
+export async function enrollMfa(friendlyName = "AMA EDU Authenticator") {
+  const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName });
+  if (error) { logError("mfa.enroll", error); throw new AppError(humanError(error)); }
+  return data;
+}
+
+export async function verifyMfa(factorId, code) {
+  const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+  if (challengeError) { logError("mfa.challenge", challengeError); throw new AppError(humanError(challengeError)); }
+  const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code: String(code).trim() });
+  if (error) { logError("mfa.verify", error); throw new AppError(humanError(error)); }
+  return true;
+}
+
+export async function unenrollMfa(factorId) {
+  const { error } = await supabase.auth.mfa.unenroll({ factorId });
+  if (error) { logError("mfa.unenroll", error); throw new AppError(humanError(error)); }
+}
+
 export async function requestPasswordReset(email) {
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
     redirectTo: `${window.location.origin}/reset-password`,

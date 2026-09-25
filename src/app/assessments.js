@@ -234,6 +234,15 @@ export default async function render({ outlet }) {
             h("p.u-xs.u-muted", { text: dist?.distinct_combinations || "" }),
           ),
           h("div.u-row", { style: { justifyContent: "flex-end", gap: "6px", margin: "10px 0" } },
+            h("button.btn.btn-ghost.btn-sm", { type: "button", text: "Copy AI prompt", onclick: async () => {
+              const text = `Create ${a.questions_per_student || "the full set of"} multiple-choice questions for ${a.classes?.name || "the selected class"} in ${a.subjects?.name || "the selected subject"}. Assessment type: ${TYPE_LABEL[a.assessment_type] || a.assessment_type}. Use this exact output format, one question per line: question | option A | option B | option C | option D | correct answer letter | marks. Do not add commentary.`;
+              await navigator.clipboard?.writeText(text); toastOk("AI prompt copied");
+            } }),
+            h("button.btn.btn-outline.btn-sm", { type: "button", text: "Import from CA", onclick: async () => {
+              const source = state.list.find((candidate) => candidate.assessment_type !== "exam" && candidate.subject_id === a.subject_id && candidate.class_id === a.class_id);
+              if (!source) return toastError("No matching CA assessment was found for this class and subject.");
+              try { const rows = unwrap(await supabase.rpc("import_assessment_questions", { p_target_assessment_id: a.id, p_source_assessment_id: source.id }), "import CA questions"); const r = Array.isArray(rows) ? rows[0] : rows; toastOk(`Imported ${r?.out_added || 0}; skipped ${r?.out_skipped || 0} duplicate(s)`); openBank(a); } catch (err) { toastError(humanError(err)); }
+            } }),
             h("button.btn.btn-outline.btn-sm", { type: "button", text: "Paste many", onclick: () => pasteMany() }),
             h("button.btn.btn-primary.btn-sm", { type: "button", text: "Add question", onclick: () => addQuestion() })),
           questions.length ? questionList(questions) : emptyState({

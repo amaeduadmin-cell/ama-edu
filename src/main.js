@@ -118,8 +118,13 @@ function registerTenantRoutes() {
 
   register("/dashboard",       page("dashboard"),      staff);
   register("/classes",         page("classes"),        staff);
+  register("/class-management",page("class-management"), { requires: "admin" });
   register("/classes/:id",     page("class-scores"),   staff);
+  register("/bulk-score-import", page("bulk-score-import"), staff);
+  register("/score-control",   page("score-control"),   { requires: "admin" });
+  register("/notifications",   page("notifications"),   staff);
   register("/students",        page("students"),       staff);
+  register("/student-operations", page("student-operations"), staff);
   register("/students/:id",    page("student-detail"), staff);
   register("/staff",           page("staff"),          staff);
   register("/curriculum",      page("curriculum"),     staff);
@@ -137,6 +142,8 @@ function registerTenantRoutes() {
   register("/certificates",    page("certificates"),   staff);
   register("/analytics",       page("analytics"),      staff);
   register("/fees",            page("fees"),           staff);
+  register("/fee-overview",    page("fee-overview"),   { requires: "auth" });
+  register("/salary",          page("salary"),         { requires: "admin" });
   register("/announcements",   page("announcements"),  staff);
   register("/import",          page("import"),         staff);
   register("/settings",        page("settings"),       staff);

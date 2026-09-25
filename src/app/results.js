@@ -19,7 +19,7 @@ export default async function render({ outlet }) {
 
   const state = { classes: [], term: null, classId: "", subjects: [], subjectId: "", view: "class" };
   const body = h("div.u-stack");
-  mount(outlet, page({ title: "Results & positions", body }));
+  mount(outlet, page({ title: "Results & positions", actions: [h("button.btn.btn-outline", { type: "button", text: "Print position list", onclick: () => window.print() })], body }));
 
   try {
     state.classes = await fetchClasses();

@@ -24,7 +24,11 @@ export default async function render({ outlet }) {
 
   const state = { classes: [], term: null, classId: "", timetableId: null, subjects: [], staff: [], slots: new Map() };
   const body = h("div.u-stack");
-  mount(outlet, page({ title: "Timetable", subtitle: "Weekly grid per class. A teacher cannot be double-booked across the school.", body }));
+  mount(outlet, page({ title: "Timetable", subtitle: "Weekly grid per class. A teacher cannot be double-booked across the school.", actions: [
+    h("button.btn.btn-outline", { type: "button", text: "Auto generate", onclick: () => autoGenerate() }),
+    h("button.btn.btn-outline", { type: "button", text: "Print", onclick: () => window.print() }),
+    h("button.btn.btn-ghost", { type: "button", text: "Export CSV", onclick: () => exportCsv() }),
+  ], body }));
 
   try {
     state.classes = await fetchClasses();
@@ -76,6 +80,23 @@ export default async function render({ outlet }) {
       logError("load timetable", err);
       mount(host, errorState(humanError(err), loadClass));
     }
+  }
+
+  async function autoGenerate() {
+    if (!state.classId || !state.term?.session_id) return;
+    try {
+      const rows = unwrap(await supabase.rpc("auto_generate_timetable", { p_class_id: state.classId, p_session_id: state.term.session_id }), "generate timetable");
+      const result = Array.isArray(rows) ? rows[0] : rows;
+      toastOk(`Generated ${result?.generated_count || 0} slot(s); ${result?.unfilled_count || 0} unfilled.`);
+      await loadClass();
+    } catch (err) { toastError(humanError(err)); }
+  }
+
+  function exportCsv() {
+    const rows = [["Day", "Period", "Subject", "Teacher"]];
+    for (const [, slot] of state.slots) rows.push([slot.day_of_week, slot.period_index, slot.subject_id || "", slot.staff_id || ""]);
+    const blob = new Blob([rows.map((r) => r.map((x) => `"${String(x).replaceAll('"', '""')}"`).join(",")).join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "ama-edu-timetable.csv"; a.click(); URL.revokeObjectURL(url);
   }
 
   function renderGrid(host) {

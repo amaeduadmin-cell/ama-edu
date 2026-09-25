@@ -43,7 +43,8 @@ export default function render({ outlet }) {
   document.title = "Register a school — AMA EDU";
 
   const form = {
-    name: "", type: "combined", email: "", phone: "", address: "",
+    name: "", type: "combined", email: "", phone: "", address: "", ward: "", lga: "", state: "", country: "Nigeria",
+    website: "", registrationNumber: "", adminPhone: "", message: "",
     slug: new URLSearchParams(window.location.search).get("slug") || "",
     adminName: "", adminEmail: "", password: "",
     sections: defaultSections("combined"), studentCount: "", template: "classic",
@@ -84,6 +85,12 @@ export default function render({ outlet }) {
     const email = h("input.input", { id: "sEmail", type: "email", required: true, value: form.email, autocomplete: "email", oninput: bind("email") });
     const phone = h("input.input", { id: "sPhone", type: "tel", value: form.phone, autocomplete: "tel", placeholder: "0803 000 0000", oninput: bind("phone") });
     const addr  = h("textarea.textarea", { id: "sAddr", oninput: bind("address") }, form.address);
+    const ward = h("input.input", { id: "sWard", value: form.ward, autocomplete: "address-level3", oninput: bind("ward") });
+    const lga = h("input.input", { id: "sLga", value: form.lga, autocomplete: "address-level2", oninput: bind("lga") });
+    const state = h("input.input", { id: "sState", value: form.state, autocomplete: "address-level1", oninput: bind("state") });
+    const country = h("input.input", { id: "sCountry", value: form.country, autocomplete: "country-name", oninput: bind("country") });
+    const website = h("input.input", { id: "sWebsite", type: "url", value: form.website, placeholder: "https://…", oninput: bind("website") });
+    const registrationNumber = h("input.input", { id: "sRegistrationNumber", value: form.registrationNumber, oninput: bind("registrationNumber") });
     const error = h("div");
 
     return h("form", { novalidate: true, onsubmit: (e) => {
@@ -101,6 +108,16 @@ export default function render({ outlet }) {
         field({ label: "Phone number", id: "sPhone", control: phone }),
       ),
       field({ label: "Address", id: "sAddr", control: addr }),
+      h("div.form-grid.cols-2", {},
+        field({ label: "Ward", id: "sWard", control: ward }),
+        field({ label: "LGA", id: "sLga", control: lga }),
+        field({ label: "State", id: "sState", control: state }),
+        field({ label: "Country", id: "sCountry", control: country }),
+      ),
+      h("div.form-grid.cols-2", {},
+        field({ label: "School website", id: "sWebsite", control: website, hint: "Optional — include https://" }),
+        field({ label: "School registration number", id: "sRegistrationNumber", control: registrationNumber, hint: "Optional" }),
+      ),
       h("button.btn.btn-primary.btn-block.btn-lg", { type: "submit", text: "Continue" }),
     );
   }
@@ -228,6 +245,8 @@ export default function render({ outlet }) {
   function stepAdmin() {
     const name  = h("input.input", { id: "aName", required: true, value: form.adminName, autocomplete: "name", oninput: bind("adminName") });
     const email = h("input.input", { id: "aEmail", type: "email", required: true, value: form.adminEmail, autocomplete: "email", oninput: bind("adminEmail") });
+    const phone = h("input.input", { id: "aPhone", type: "tel", value: form.adminPhone, autocomplete: "tel", oninput: bind("adminPhone") });
+    const message = h("textarea.textarea", { id: "aMessage", rows: "4", oninput: bind("message") }, form.message);
     const error = h("div");
     const submit = h("button.btn.btn-primary.btn-block.btn-lg", { type: "submit", text: "Submit application" });
 
@@ -252,6 +271,8 @@ export default function render({ outlet }) {
       error,
       field({ label: "Administrator's full name", id: "aName", control: name }),
       field({ label: "Administrator's email", id: "aEmail", control: email, hint: "Used to sign in and to receive password resets." }),
+      field({ label: "Administrator's phone number", id: "aPhone", control: phone, hint: "Optional — useful for onboarding." }),
+      field({ label: "Additional information", id: "aMessage", control: message, hint: "Anything else AMA EDU should know about the school or application." }),
       h("p.u-xs.u-muted", { text: "By applying you confirm you are authorised to represent this school. Do not send a password; the administrator account is created after approval." }),
       h("div.u-row.u-mt-4", {},
         h("button.btn.btn-outline", { type: "button", text: "Back", onclick: () => { step = 2; draw(); } }),
@@ -286,6 +307,8 @@ async function createSchool(form) {
   const { data, error } = await supabase.rpc("submit_school_application", { p_payload: {
     school_name: form.name.trim(), slug: form.slug, school_type: form.type,
     school_email: form.email.trim(), school_phone: form.phone.trim(), address: form.address.trim(),
+    ward: form.ward.trim(), lga: form.lga.trim(), state: form.state.trim(), country: form.country.trim() || "Nigeria",
+    website: form.website.trim(), registration_number: form.registrationNumber.trim(), admin_phone: form.adminPhone.trim(), message: form.message.trim(),
     sections: [...form.sections], declared_student_count: form.studentCount === "" ? null : Number(form.studentCount),
     report_card_template: form.template, admin_full_name: form.adminName.trim(), admin_email: form.adminEmail.trim(),
   } });

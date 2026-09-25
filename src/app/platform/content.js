@@ -170,6 +170,7 @@ export default async function render({ outlet }) {
   /* ---------------- payments ---------------- */
   function paymentsPanel() {
     const p = state.payments;
+    const gatewayEnabled = h("input", { type: "checkbox", checked: p.gateway_enabled === true, style: { width: "20px", height: "20px" } });
     const method = h("select.select", {}, [
       ["bank_transfer", "Bank transfer only"], ["gateway", "Payment gateway only"], ["both", "Both"],
     ].map(([v, l]) => h("option", { value: v, selected: p.method === v, text: l })));
@@ -187,6 +188,8 @@ export default async function render({ outlet }) {
 
     return card("How schools pay AMA EDU", slot, [
       inlineAlert("This is AMA EDU's own subscription billing. It is separate from the fees a school collects from its students, and a school cannot change these details.", "info"),
+      h("label.u-row", { style: { gap: "8px", margin: "8px 0 14px" } }, gatewayEnabled, h("span", { text: "Payment gateway connected and available" })),
+      inlineAlert("The publishable key is safe for the browser. Keep the gateway secret key in Supabase Edge Function secrets (for example PAYSTACK_SECRET_KEY or FLUTTERWAVE_SECRET_KEY), never in this database or frontend. Untick the connection above and save to disconnect gateway payments immediately.", "info"),
       field({ label: "Method", id: "payMethod", control: method }),
       row(field({ label: "Bank name", id: "payBank", control: bank }),
           field({ label: "Account name", id: "payAccName", control: accName })),
@@ -203,6 +206,8 @@ export default async function render({ outlet }) {
       payment_instructions: instructions.value.trim() || null,
       gateway_name: gateway.value.trim() || null,
       gateway_public_key: gatewayKey.value.trim() || null,
+      gateway_enabled: gatewayEnabled.checked,
+      gateway_disconnected_at: gatewayEnabled.checked ? (p.gateway_disconnected_at || null) : new Date().toISOString(),
       price_per_student: price.value ? Number(price.value) : null,
       billing_period: period.value,
     }), "platform_payment_settings");

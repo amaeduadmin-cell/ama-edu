@@ -78,3 +78,9 @@ Academic settings loads several administrator-only RPCs in one request. The live
 School administrators configure **Settings → School payment instructions** with a bank name, account name, account number, and family-facing instructions. This is an account-payment workflow, not an API gateway: no API keys, card data, PINs, passwords, or gateway secrets are accepted or stored. RLS limits reads to authenticated members of that school and limits writes to school administrators. Active instructions are shown to authenticated parents in the school portal; they are not exposed through public school profiles.
 
 Platform administrators can edit the public founder section under **AMA EDU admin → Public website → Website**, including founder name, title, history, and an HTTPS image URL. The landing page renders the section only from the public CMS RPC and validates image URLs as HTTPS before inserting them as images. The platform stores the URL rather than handling arbitrary file uploads.
+
+## School registration details and gateway connection
+
+Migration `0047_registration_location_and_gateway_controls.sql` adds ward, LGA, state, country, school website, registration number, administrator phone, and additional information to the public school application flow. Approved applications carry the location and registration details into the provisioned `schools` row.
+
+The platform payment settings screen now has an explicit **Payment gateway connected and available** switch. Disabling and saving it records the disconnect time and lets the platform stop using gateway payments without deleting the configuration. Publishable keys may be stored for browser checkout; gateway secret keys must be configured as Supabase Edge Function secrets and are never stored in Postgres or sent to the frontend.

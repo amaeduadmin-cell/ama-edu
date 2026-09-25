@@ -14,3 +14,7 @@ The database state is suitable for an edge-level maintenance interceptor, but Cl
 - Store gateway, email, and provider secrets in Supabase/Cloudflare secret stores, never in Git.
 - Test restoring a non-production project from a recent backup before changing production schema.
 - Record DNS, wildcard TLS, Cloudflare routes, Supabase project ID, and required environment variables in the deployment runbook.
+
+## Automated billing and usage runner
+
+Migration `0051_billing_automation_runner.sql` adds a forced-RLS run ledger and a security-definer runner. Migration `0052_schedule_billing_automation.sql` enables the daily `pg_cron` job `amaedu-billing-automation` at **02:15 UTC**. Each run captures active students and staff into `school_usage_snapshots`, changes expired active/trial subscriptions to grace, marks overdue invoices, and creates deduplicated usage/billing alerts. The `billing-automation` Edge Function is also available for a trusted external scheduler using the `AUTOMATION_RUNNER_SECRET` header; it does not accept browser credentials.

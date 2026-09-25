@@ -18,3 +18,9 @@
 - Mobile keyboard/focus/accessibility pass on registration, score entry, and report pages.
 
 Do not mark usage, revenue, uptime, or payment success as real until an actual provider or scheduled aggregation job has recorded it.
+
+## 2026-09-25 validation run
+
+The production build passed after the operations UI and public status/maintenance routes were added. Every `src/*.js` file passed `node --check`, `git diff --check` passed, the live Supabase probes returned one maintenance row and nine service-status rows, and all ten new operational tables reported both RLS and forced RLS enabled. The public maintenance and status RPCs were confirmed executable by `anon` and `authenticated`.
+
+The built-output credential scan found only the literal names `PAYSTACK_SECRET` and `FLUTTERWAVE_SECRET` in the admin guidance text. No service-role token, JWT, `sk_live_*`, or `sk_test_*` value was present, and no secret-like assignment was found. The existing Python Supabase probe could not run from this shell because `SUPABASE_URL` and `SUPABASE_KEY` are not exported; equivalent live checks were run through the configured Supabase connector.

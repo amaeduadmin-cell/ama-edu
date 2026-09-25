@@ -7,6 +7,12 @@ Migration `0048_platform_operations_and_billing_foundations.sql` provides `platf
 
 The database state is suitable for an edge-level maintenance interceptor, but Cloudflare interception still needs to be configured in the production account. Application routes should remain available for platform-admin bypass and status visibility.
 
+## Monitoring and disaster recovery
+
+Migration `0057_reliability_backup_dr_foundations.sql` adds forced-RLS health checks, incident records, backup verification metadata, restore-drill evidence, and a reliability run ledger. The `amaedu-reliability-checks` pg_cron job runs every 15 minutes and records database and billing-automation health. Migrations `0058` and `0059` harden the runner after live validation of PostgreSQL output-column name collisions.
+
+The platform records whether a backup artifact was completed or verified; it does not pretend to create a provider backup from inside the application. Supabase backup/PITR settings, off-site exports, Storage-object backup, and restore-to-isolated-project drills remain production operations and are documented in `RELIABILITY.md`.
+
 ## Recovery baseline
 
 - Supabase database backups and point-in-time recovery should be enabled in the project plan.

@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
   try {
     const payload: Record<string, unknown> = { exported_at: new Date().toISOString(), school_id: job.school_id, scope: job.scope };
     const tables: Record<string, string[]> = {
-      school: ["schools", "staff", "students", "parents", "classes", "subjects", "terms"],
+      school: ["schools", "sessions", "terms", "staff", "students", "parents", "classes", "subjects", "class_subjects", "class_teacher_subjects", "parent_students"],
       students: ["students", "parents", "parent_students", "classes"],
       academic: ["students", "classes", "subjects", "terms", "student_term_summary"],
       billing: ["school_subscriptions", "school_billing_invoices", "school_invoice_items", "school_invoice_payments"],

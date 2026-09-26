@@ -142,9 +142,9 @@ function founderSection(content) {
   const image = content.founder_image_url && /^https:\/\//i.test(content.founder_image_url)
     ? h("img", { src: content.founder_image_url, alt: content.founder_name || "AMA EDU founder", loading: "lazy", referrerpolicy: "no-referrer", style: { width: "100%", maxWidth: "320px", aspectRatio: "4 / 5", objectFit: "cover", borderRadius: "18px", boxShadow: "0 18px 45px rgba(5, 24, 18, .18)" } })
     : h("div", { style: { width: "100%", maxWidth: "320px", aspectRatio: "4 / 5", borderRadius: "18px", background: "linear-gradient(145deg, var(--ama-green-soft), var(--ama-gold-soft))", display: "grid", placeItems: "center", color: "var(--ama-green-deep)", fontSize: "64px", fontWeight: "800" }, text: (content.founder_name || "A").slice(0, 1).toUpperCase() });
-  return h("section.section.section-light", {}, h("div.shell-width", {}, h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "clamp(28px, 6vw, 76px)", alignItems: "center" } },
-    h("div", { style: { display: "grid", placeItems: "center" } }, image),
-    h("div", {}, h("div.eyebrow", { text: "Founder & story" }), h("h2", { text: content.founder_name || "Built with purpose" }), content.founder_title ? h("p", { style: { color: "var(--ama-gold-deep)", fontWeight: "700" }, text: content.founder_title }) : null, h("p.section-lede", { style: { whiteSpace: "pre-line" }, text: content.founder_history || "AMA EDU exists to make excellent school administration more accessible, consistent and human." }))
+  return h("section.section.section-light", {}, h("div.shell-width", {}, h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "clamp(28px, 6vw, 76px)", alignItems: "start" } },
+    h("div", { style: { display: "grid", placeItems: "start" } }, image),
+    h("div", {}, h("div.eyebrow", { text: "Founder Story" }), h("h2", { text: content.founder_name || "Built with purpose" }), content.founder_title ? h("p", { style: { color: "var(--ama-gold-deep)", fontWeight: "700" }, text: content.founder_title }) : null, h("p.section-lede", { style: { whiteSpace: "pre-line" }, text: content.founder_history || "AMA EDU exists to make excellent school administration more accessible, consistent and human." }))
   )));
 }
 

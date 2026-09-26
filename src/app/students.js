@@ -128,7 +128,7 @@ export default async function render({ outlet }) {
             h("option", { value: "", text: "All classes" }),
             state.classes.map((c) => h("option", { value: c.id, text: c.name })),
           ),
-          canWrite && state.selected.size ? h("button.btn.btn-danger.btn-sm", { type: "button", text: `Delete selected (${state.selected.size})`, onclick: () => deleteStudents([...state.selected]) }) : null,
+          isAdmin && state.selected.size ? h("button.btn.btn-danger.btn-sm", { type: "button", text: `Delete selected (${state.selected.size})`, onclick: () => deleteStudents([...state.selected]) }) : null,
         ),
         rows.length ? table(rows) : h("div", { style: { padding: "16px" } }, emptyState({
           title: state.total ? "No students match" : "No students yet",
@@ -160,7 +160,7 @@ export default async function render({ outlet }) {
     };
     return h("div.table-wrap", {}, h("table.table", {},
       h("thead", {}, h("tr", {},
-        canWrite ? h("th", {}, selectAll) : null,
+        isAdmin ? h("th", {}, selectAll) : null,
         h("th", { text: "Student" }),
         h("th", { text: "Admission no." }),
         h("th", { text: "Class" }),
@@ -170,7 +170,7 @@ export default async function render({ outlet }) {
         canWrite ? h("th", { text: "" }) : null,
       )),
       h("tbody", {}, rows.map((s) => h("tr", {},
-        canWrite ? h("td", {}, h("input", { type: "checkbox", checked: state.selected.has(s.id), "aria-label": `Select ${s.full_name}`, onchange: (e) => { e.target.checked ? state.selected.add(s.id) : state.selected.delete(s.id); draw(); } })) : null,
+        isAdmin ? h("td", {}, h("input", { type: "checkbox", checked: state.selected.has(s.id), "aria-label": `Select ${s.full_name}`, onchange: (e) => { e.target.checked ? state.selected.add(s.id) : state.selected.delete(s.id); draw(); } })) : null,
         h("td", {}, h("a", { href: `/students/${s.id}`, style: { textDecoration: "none", color: "inherit", fontWeight: "600" } }, s.full_name)),
         h("td.u-num", { text: s.admission_no }),
         h("td", { text: s.classes?.name || "—" }),
@@ -185,7 +185,7 @@ export default async function render({ outlet }) {
           h("div.u-row", { style: { gap: "6px", justifyContent: "flex-end" } },
             h("button.btn.btn-ghost.btn-sm", { type: "button", text: "Edit", onclick: () => openStudentForm(s) }),
             h("button.btn.btn-ghost.btn-sm", { type: "button", text: s.is_active ? "Deactivate" : "Reactivate", onclick: () => toggleActive(s) }),
-            h("button.btn.btn-danger.btn-sm", { type: "button", text: "Delete", onclick: () => deleteStudents([s.id]) }),
+            isAdmin ? h("button.btn.btn-danger.btn-sm", { type: "button", text: "Delete", onclick: () => deleteStudents([s.id]) }) : null,
           )) : null,
       ))),
     ));

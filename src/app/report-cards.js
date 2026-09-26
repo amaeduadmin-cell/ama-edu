@@ -83,7 +83,8 @@ export default async function render({ outlet }) {
     const studentSel = h("select.select.no-print", { style: { maxWidth: "260px" } },
       h("option", { value: "", text: "Select a student" }),
       state.students.map((s) => h("option", { value: s.id, text: `${s.full_name} (${s.admission_no})` })));
-    const printBtn = h("button.btn.btn-outline.no-print", { type: "button", text: "Print", onclick: () => window.print(), disabled: true });
+    const printBtn = h("button.btn.btn-outline.no-print", { type: "button", text: "Print student", onclick: () => window.print(), disabled: true });
+    const classPrintBtn = h("button.btn.btn-primary.no-print", { type: "button", text: `Print class (${state.students.length})`, onclick: printClass });
     const preview = h("div#reportPreview.u-mt-4");
 
     studentSel.addEventListener("change", async () => {
@@ -92,7 +93,7 @@ export default async function render({ outlet }) {
       if (state.studentId) await loadReport();
     });
 
-    mount(host, h("div.u-row.no-print", { style: { marginBottom: "12px" } }, studentSel, printBtn), preview);
+    mount(host, h("div.u-row.no-print", { style: { marginBottom: "12px" } }, studentSel, printBtn, classPrintBtn), preview);
   }
 
   async function loadReport() {
@@ -101,35 +102,51 @@ export default async function render({ outlet }) {
     try {
       const klass = state.classes.find((c) => c.id === state.classId);
       const student = state.students.find((s) => s.id === state.studentId);
-      const [scores, summaryRows] = await Promise.all([
-        unwrap(await supabase.from("student_scores").select("ca1,ca2,ca3,exam,total,grade,subject_position,subjects(name)").eq("student_id", state.studentId).eq("term_id", state.term.id).eq("is_offered", true), "fetch scores"),
-        unwrap(await supabase.from("student_term_summary").select("*").eq("student_id", state.studentId).eq("term_id", state.term.id).limit(1), "fetch summary"),
-      ]);
-
-      // Template 4 only: the annual-summary row, the role-mapped
-      // Headmaster/Principal signature, and the QR verification code.
-      // Skipped for other templates so switching template doesn't add
-      // extra round-trips nobody asked for.
-      let sessionSummaries = null, headSignatory = null, verificationCode = null;
-      if (context.school?.report_card_template === "pariya") {
-        [sessionSummaries, headSignatory, verificationCode] = await Promise.all([
-          fetchSessionTermAverages(state.studentId, state.term.session_id),
-          fetchHeadSignatory(klass?.category, context.school),
-          fetchVerificationCode(state.studentId, state.term.id),
-        ]);
-      }
-
-      mount(preview, renderReportCard({
-        school: context.school, student, class: klass, term: state.term,
-        scores, summary: summaryRows?.[0] || null, weights: state.weights,
-        template: context.school?.report_card_template,
-        components: state.rc.components, bands: state.rc.bands,
-        remarks: state.rc.remarks, settings: state.rc.settings,
-        sessionSummaries, headSignatory, verificationCode,
-      }));
+      mount(preview, await renderCardForStudent(student, klass));
     } catch (err) {
       logError("load report", err);
       mount(preview, errorState(humanError(err), loadReport));
+    }
+  }
+
+  async function renderCardForStudent(student, klass) {
+    const [scores, summaryRows] = await Promise.all([
+      supabase.from("student_scores").select("ca1,ca2,ca3,exam,total,grade,subject_position,subjects(name)").eq("student_id", student.id).eq("term_id", state.term.id).eq("is_offered", true),
+      supabase.from("student_term_summary").select("*").eq("student_id", student.id).eq("term_id", state.term.id).limit(1),
+    ]);
+    const scoreRows = unwrap(scores, "fetch scores");
+    const summary = unwrap(summaryRows, "fetch summary");
+    let sessionSummaries = null, headSignatory = null, verificationCode = null;
+    if (context.school?.report_card_template === "pariya") {
+      [sessionSummaries, headSignatory, verificationCode] = await Promise.all([
+        fetchSessionTermAverages(student.id, state.term.session_id),
+        fetchHeadSignatory(klass?.category, context.school),
+        fetchVerificationCode(student.id, state.term.id),
+      ]);
+    }
+    return renderReportCard({
+      school: context.school, student, class: klass, term: state.term,
+      scores: scoreRows, summary: summary?.[0] || null, weights: state.weights,
+      template: context.school?.report_card_template,
+      components: state.rc.components, bands: state.rc.bands,
+      remarks: state.rc.remarks, settings: state.rc.settings,
+      sessionSummaries, headSignatory, verificationCode,
+    });
+  }
+
+  async function printClass() {
+    const host = document.getElementById("reportHost");
+    const klass = state.classes.find((c) => c.id === state.classId);
+    const studentsInSelectedClass = state.students.slice();
+    if (!klass || !studentsInSelectedClass.length) return;
+    mount(host, h("div.no-print", {}, h("p.u-muted", { text: `Preparing ${studentsInSelectedClass.length} report cards for ${klass.name}…` })));
+    try {
+      const cards = await Promise.all(studentsInSelectedClass.map((student) => renderCardForStudent(student, klass)));
+      mount(host, h("div.report-card-batch", {}, cards));
+      requestAnimationFrame(() => window.print());
+    } catch (err) {
+      logError("print class reports", err);
+      mount(host, errorState(humanError(err), loadStudents));
     }
   }
 }

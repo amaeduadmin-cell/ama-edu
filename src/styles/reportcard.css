@@ -356,7 +356,7 @@
 
 @media print {
   /* Nothing from the dashboard shell reaches the paper. */
-  .no-print, .sidebar, .topbar, .sidebar-scrim, .page-actions, .app-footer { display: none !important; }
+  .no-print, .sidebar, .topbar, .sidebar-scrim, .page-head, .page-actions, .app-footer { display: none !important; }
 
   html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
   .shell, .shell-body, .main { display: block !important; margin: 0 !important; padding: 0 !important; }
@@ -364,12 +364,35 @@
   .report-card {
     width: 190mm; max-width: 190mm; margin: 0 auto;
     border: none; border-radius: 0; box-shadow: none;
-    padding: 0; font-size: 11pt;
-    break-inside: avoid;
+    padding: 0; font-size: 10pt;
+    break-inside: avoid; page-break-inside: avoid;
   }
 
-  /* One report per sheet when several are printed together. */
-  .report-card + .report-card { break-before: page; }
+  /* The first card starts on the current print page. Every later card starts
+     on a new sheet; no page is reserved before the first or after the last. */
+  .report-card-batch > .report-card + .report-card,
+  .report-card + .report-card { break-before: page; page-break-before: always; }
+  .report-card-batch > .report-card:first-child { break-before: auto; page-break-before: auto; }
+  .report-card-batch { margin: 0 !important; padding: 0 !important; }
+
+  /* Keep normal class rosters within one A4 sheet instead of allowing the
+     table, summary, or signatures to drift onto a second sheet. */
+  .report-card .rc-head { padding-bottom: 7px; }
+  .report-card .rc-title { margin-top: 7px; }
+  .report-card .rc-meta { margin: 7px 0; padding: 6px 8px; }
+  .report-card .rc-table th, .report-card .rc-table td { padding: 3px 4px; }
+  .report-card .rc-summary { margin-top: 8px; gap: 5px; }
+  .report-card .rc-stat { padding: 5px 6px; }
+  .report-card .rc-stat-value { font-size: 12px; }
+  .report-card .rc-signatures { margin-top: 12px; gap: 12px; }
+  .report-card .rc-sign-line { height: 18px; }
+  .report-card .rc-seal { width: 56px; height: 56px; }
+  .report-card.rc-rich { padding: 10px 12px; }
+  .report-card .rc3-infobox { padding: 5px 8px; margin-bottom: 7px; }
+  .report-card .rc3-info-line { padding: 2px 0; }
+  .report-card .rc3-table th, .report-card .rc3-table td { padding: 3px 4px; }
+  .report-card .rc3-remarks-box { padding: 5px 8px; margin-bottom: 8px; }
+  .report-card .rc3-seal { width: 54px; height: 54px; }
 
   .rc-table { font-size: 9.5pt; }
   .rc-table thead { display: table-header-group; }   /* repeat header across pages */

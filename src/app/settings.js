@@ -48,6 +48,7 @@ export default async function render({ outlet }) {
           passwordCard(),
           securityCard(),
           dataExportCard(),
+          dataImportCard(),
       );
     } catch (err) {
       logError("settings boot", err);
@@ -72,7 +73,45 @@ function dataExportCard() {
       mount(note, inlineAlert("Export ready. The private download link expires in one hour.", "info"));
     } catch (err) { mount(note, inlineAlert(humanError(err))); } finally { setBusy(button, false); }
   };
-  return h("section.card", {}, h("div.card-head", {}, h("div", {}, h("h2.card-title", { text: "Data export" }), h("div.card-sub", { text: "Create a private, expiring export for an approved school purpose." })), h("span.badge.badge-info", { text: "Admin" })), inlineAlert("Exports include only records belonging to this school. Download links expire after one hour and are not public.", "info"), h("div.form-grid.cols-2", {}, field({ label: "Scope", id: "exportScope", control: scope }), field({ label: "Format", id: "exportFormat", control: format })), note, button);
+  return h("section.card", {}, h("div.card-head", {}, h("div", {}, h("h2.card-title", { text: "Backup and export" }), h("div.card-sub", { text: "Create a private, expiring backup or export for this school." })), h("span.badge.badge-info", { text: "Admin" })), inlineAlert("Exports include only records belonging to this school. Download links expire after one hour and are not public. Use JSON for a future backup restore.", "info"), h("div.form-grid.cols-2", {}, field({ label: "Scope", id: "exportScope", control: scope }), field({ label: "Format", id: "exportFormat", control: format })), note, button);
+}
+
+function dataImportCard() {
+  const file = h("input.input", { type: "file", accept: "application/json,.json" });
+  const note = h("div");
+  const button = h("button.btn.btn-outline", { type: "button", text: "Import JSON backup" });
+  button.onclick = async () => {
+    const selected = file.files?.[0];
+    if (!selected) return mount(note, inlineAlert("Choose a JSON backup file first."));
+    if (selected.size > 25 * 1024 * 1024) return mount(note, inlineAlert("Backup files must be 25 MB or smaller."));
+    if (!await confirmAction({ title: "Import this school backup?", message: "This merges school master data from the backup into the current school. Existing records with the same IDs will be updated. Login accounts and passwords are never imported.", confirmLabel: "Import backup", danger: true })) return;
+    setBusy(button, true, "Importing…");
+    try {
+      const payload = JSON.parse(await selected.text());
+      if (!payload || typeof payload !== "object" || !payload.exported_at || !payload.school_id || payload.school_id !== session.schoolId) throw new Error("This is not a valid backup for the current school.");
+      const tables = ["sessions", "terms", "staff", "classes", "subjects", "parents", "students", "class_subjects", "class_teacher_subjects", "parent_students"];
+      let imported = 0;
+      for (const table of tables) {
+        const rows = Array.isArray(payload[table]) ? payload[table] : [];
+        const safeRows = rows.map((row) => {
+          const copy = { ...row, school_id: session.schoolId };
+          delete copy.user_id;
+          delete copy.created_by;
+          delete copy.updated_by;
+          return copy;
+        }).filter((row) => row.id);
+        for (let i = 0; i < safeRows.length; i += 200) {
+          const batch = safeRows.slice(i, i + 200);
+          unwrap(await supabase.from(table).upsert(batch, { onConflict: "id" }), `import ${table}`);
+          imported += batch.length;
+        }
+      }
+      toastOk(`Backup imported: ${imported} records merged`);
+      mount(note, inlineAlert("Backup import completed. Check Students, Staff and Academic settings to confirm the restored records.", "success"));
+    } catch (err) { mount(note, inlineAlert(humanError(err, "Backup import failed. Use a JSON export created by AMA EDU for this same school."))); }
+    finally { setBusy(button, false); }
+  };
+  return h("section.card", {}, h("div.card-head", {}, h("div", {}, h("h2.card-title", { text: "Import backup" }), h("div.card-sub", { text: "Restore school master data from an AMA EDU JSON export." })), h("span.badge.badge-warn", { text: "Admin" })), inlineAlert("Import is tenant-locked to this school. It merges sessions, terms, classes, subjects, staff, students, parents and links; it does not recreate authentication accounts or passwords.", "info"), field({ label: "AMA EDU JSON backup", id: "backupFile", control: file }), note, button);
 }
 
 function securityCard() {

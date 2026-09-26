@@ -38,7 +38,9 @@ Deno.serve(async (req: Request) => {
       billing: ["school_subscriptions", "school_billing_invoices", "school_invoice_items", "school_invoice_payments"],
     };
     for (const table of tables[job.scope] || tables.school) {
-      const { data, error } = await admin.from(table).select("*").eq("school_id", job.school_id).limit(10000);
+      const query = admin.from(table).select("*");
+      const scoped = table === "schools" ? query.eq("id", job.school_id) : query.eq("school_id", job.school_id);
+      const { data, error } = await scoped.limit(10000);
       if (error) throw new Error(`Could not export ${table}`);
       payload[table] = data || [];
     }

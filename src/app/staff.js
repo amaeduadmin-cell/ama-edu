@@ -28,7 +28,7 @@ const PAGE_SIZE = 25;
 export default async function render({ outlet }) {
   if (!requireRole(outlet, "admin")) return;
 
-  const state = { search: "", staff: [], loading: true, page: 0, total: 0 };
+  const state = { search: "", staff: [], loading: true, page: 0, total: 0, selected: new Set() };
   const body = h("div.u-stack");
   mount(outlet, page({
     title: "Staff",
@@ -100,9 +100,10 @@ export default async function render({ outlet }) {
     mount(body,
       h("div.card.card-flush", {},
         h("div.u-row", { style: { padding: "16px", borderBottom: "1px solid var(--ama-line)" } },
-          h("input.input.u-grow#staffSearch", { type: "search", placeholder: "Search by name or staff ID", value: state.search,
+        h("input.input.u-grow#staffSearch", { type: "search", placeholder: "Search by name or staff ID", value: state.search,
             oninput: (e) => { searchCaret = e.target.selectionStart; onSearchInput(e.target.value); },
             onfocus: () => { searchFocused = true; }, onblur: () => { searchFocused = false; } })),
+        state.selected.size ? h("button.btn.btn-danger.btn-sm", { type: "button", text: `Delete selected (${state.selected.size})`, onclick: () => deleteStaff([...state.selected]) }) : null,
         rows.length ? table(rows) : h("div", { style: { padding: "16px" } }, emptyState({
           title: state.total ? "No staff match" : "No staff yet",
           body: state.total ? "Try a different name or ID." : "Add your first staff member to get started.",
@@ -124,12 +125,20 @@ export default async function render({ outlet }) {
   }
 
   function table(rows) {
+    const allSelected = rows.length > 0 && rows.every((staff) => state.selected.has(staff.id));
+    const selectAll = h("input", { type: "checkbox", checked: allSelected, "aria-label": "Select all staff on this page" });
+    selectAll.onchange = () => {
+      rows.forEach((staff) => selectAll.checked ? state.selected.add(staff.id) : state.selected.delete(staff.id));
+      draw();
+    };
     return h("div.table-wrap", {}, h("table.table", {},
       h("thead", {}, h("tr", {},
+        h("th", {}, selectAll),
         h("th", { text: "Staff" }), h("th", { text: "ID" }), h("th", { text: "Roles" }),
         h("th", { text: "Login" }), h("th", { text: "Status" }), h("th", { text: "" }),
       )),
       h("tbody", {}, rows.map((s) => h("tr", {},
+        h("td", {}, h("input", { type: "checkbox", checked: state.selected.has(s.id), "aria-label": `Select ${s.full_name}`, onchange: (e) => { e.target.checked ? state.selected.add(s.id) : state.selected.delete(s.id); draw(); } })),
         h("td", {}, h("div", { style: { fontWeight: "600" }, text: s.full_name }), h("div.u-xs.u-muted", { text: s.position || "" })),
         h("td.u-num", { text: s.staff_code }),
         h("td", {}, s.roles?.length
@@ -140,9 +149,28 @@ export default async function render({ outlet }) {
         h("td", {}, h("div.u-row", { style: { gap: "6px", justifyContent: "flex-end" } },
           h("button.btn.btn-ghost.btn-sm", { type: "button", text: "Edit", onclick: () => openStaffForm(s) }),
           h("button.btn.btn-ghost.btn-sm", { type: "button", text: s.is_active ? "Deactivate" : "Reactivate", onclick: () => toggleActive(s) }),
+          h("button.btn.btn-danger.btn-sm", { type: "button", text: "Delete", disabled: s.user_id === session.userId, onclick: () => deleteStaff([s.id]) }),
         )),
       ))),
     ));
+  }
+
+  async function deleteStaff(ids) {
+    const selected = state.staff.filter((staff) => ids.includes(staff.id));
+    const names = selected.map((staff) => staff.full_name).join(", ");
+    const ok = await confirmAction({
+      title: ids.length > 1 ? `Delete ${ids.length} staff members?` : "Delete this staff member?",
+      message: `${names || `${ids.length} selected staff member${ids.length === 1 ? "" : "s"}`} and linked staff records will be permanently deleted. Export a backup first if you may need them later.`,
+      confirmLabel: "Delete permanently",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const count = unwrap(await supabase.rpc("delete_staff", { p_staff_ids: ids }), "delete staff");
+      state.selected.clear();
+      toastOk(`${count || ids.length} staff member${(count || ids.length) === 1 ? "" : "s"} deleted`);
+      await load();
+    } catch (err) { toastError(humanError(err)); }
   }
 
   async function toggleActive(staff) {

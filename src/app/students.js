@@ -21,7 +21,7 @@ const PAGE_SIZE = 25;
 export default async function render({ outlet }) {
   if (!requireRole(outlet, "admin", "registrar_primary", "registrar_secondary", "teacher", "headmaster", "principal")) return;
 
-  const state = { search: "", classId: "", students: [], classes: [], loading: true, page: 0, total: 0 };
+  const state = { search: "", classId: "", students: [], classes: [], loading: true, page: 0, total: 0, selected: new Set() };
   const canWrite = hasRole("admin", "registrar_primary", "registrar_secondary");
 
   const body = h("div.u-stack");
@@ -128,6 +128,7 @@ export default async function render({ outlet }) {
             h("option", { value: "", text: "All classes" }),
             state.classes.map((c) => h("option", { value: c.id, text: c.name })),
           ),
+          canWrite && state.selected.size ? h("button.btn.btn-danger.btn-sm", { type: "button", text: `Delete selected (${state.selected.size})`, onclick: () => deleteStudents([...state.selected]) }) : null,
         ),
         rows.length ? table(rows) : h("div", { style: { padding: "16px" } }, emptyState({
           title: state.total ? "No students match" : "No students yet",
@@ -151,8 +152,15 @@ export default async function render({ outlet }) {
   }
 
   function table(rows) {
+    const allSelected = rows.length > 0 && rows.every((student) => state.selected.has(student.id));
+    const selectAll = h("input", { type: "checkbox", checked: allSelected, "aria-label": "Select all students on this page" });
+    selectAll.onchange = () => {
+      rows.forEach((student) => selectAll.checked ? state.selected.add(student.id) : state.selected.delete(student.id));
+      draw();
+    };
     return h("div.table-wrap", {}, h("table.table", {},
       h("thead", {}, h("tr", {},
+        canWrite ? h("th", {}, selectAll) : null,
         h("th", { text: "Student" }),
         h("th", { text: "Admission no." }),
         h("th", { text: "Class" }),
@@ -162,6 +170,7 @@ export default async function render({ outlet }) {
         canWrite ? h("th", { text: "" }) : null,
       )),
       h("tbody", {}, rows.map((s) => h("tr", {},
+        canWrite ? h("td", {}, h("input", { type: "checkbox", checked: state.selected.has(s.id), "aria-label": `Select ${s.full_name}`, onchange: (e) => { e.target.checked ? state.selected.add(s.id) : state.selected.delete(s.id); draw(); } })) : null,
         h("td", {}, h("a", { href: `/students/${s.id}`, style: { textDecoration: "none", color: "inherit", fontWeight: "600" } }, s.full_name)),
         h("td.u-num", { text: s.admission_no }),
         h("td", { text: s.classes?.name || "—" }),
@@ -176,9 +185,28 @@ export default async function render({ outlet }) {
           h("div.u-row", { style: { gap: "6px", justifyContent: "flex-end" } },
             h("button.btn.btn-ghost.btn-sm", { type: "button", text: "Edit", onclick: () => openStudentForm(s) }),
             h("button.btn.btn-ghost.btn-sm", { type: "button", text: s.is_active ? "Deactivate" : "Reactivate", onclick: () => toggleActive(s) }),
+            h("button.btn.btn-danger.btn-sm", { type: "button", text: "Delete", onclick: () => deleteStudents([s.id]) }),
           )) : null,
       ))),
     ));
+  }
+
+  async function deleteStudents(ids) {
+    const selected = state.students.filter((student) => ids.includes(student.id));
+    const names = selected.map((student) => student.full_name).join(", ");
+    const ok = await confirmAction({
+      title: ids.length > 1 ? `Delete ${ids.length} students?` : "Delete this student?",
+      message: `${names || `${ids.length} selected student${ids.length === 1 ? "" : "s"}`} and their linked academic records will be permanently deleted. Export a backup first if you may need them later.`,
+      confirmLabel: "Delete permanently",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const count = unwrap(await supabase.rpc("delete_students", { p_student_ids: ids }), "delete students");
+      state.selected.clear();
+      toastOk(`${count || ids.length} student${(count || ids.length) === 1 ? "" : "s"} deleted`);
+      await load();
+    } catch (err) { toastError(humanError(err)); }
   }
 
   async function toggleActive(student) {

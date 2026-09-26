@@ -4,16 +4,39 @@ import "../styles/marketing.css";
 import { h, mount } from "../lib/dom.js";
 import { ROOT } from "../lib/tenant.js";
 import { supabase } from "../lib/supabase.js";
-
+import { setSeo, jsonLd } from "../lib/seo.js";
 export default async function render({ outlet }) {
-  document.title = "AMA EDU — school management for Nigerian schools";
+  setSeo({
+    title: "AMA EDU — School management for Nigerian schools",
+    description: "AMA EDU Digital Solutions is a school management platform for Nigerian schools, founded to make enrolment, results, report cards, fees and parent access simpler.",
+    canonical: `${window.location.origin}/`,
+  });
   const founderHost = h("div");
   mount(outlet, siteNav(), hero(), proofStrip(), whatItDoes(), howTenancyWorks(), builtFor(), founderHost, ctaBand(), siteFooter());
   try {
     const { data, error } = await supabase.rpc("public_platform_content");
     if (error) throw error;
     const content = Array.isArray(data) ? data[0] : data;
-    if (content?.founder_name || content?.founder_history || content?.founder_image_url) mount(founderHost, founderSection(content));
+    if (content?.founder_name || content?.founder_history || content?.founder_image_url) {
+      mount(founderHost, founderSection(content));
+      const founderName = content.founder_name?.trim();
+      const story = content.founder_history?.trim();
+      if (founderName) {
+        setSeo({
+          title: `${founderName} — Founder of AMA EDU Digital Solutions | AMA EDU`,
+          description: story ? `${founderName}, founder of AMA EDU Digital Solutions, shares the story behind AMA EDU, a school management platform for Nigerian schools. ${story}`.slice(0, 300) : `${founderName} is the founder of AMA EDU Digital Solutions, a school management platform for Nigerian schools.`,
+          canonical: `${window.location.origin}/`,
+        });
+        jsonLd("founder", {
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "AMA EDU Digital Solutions",
+          url: `${window.location.origin}/`,
+          description: "School management platform for Nigerian schools.",
+          founder: { "@type": "Person", name: founderName, description: story || undefined },
+        });
+      }
+    }
   } catch { /* The public landing page remains usable if CMS content is unavailable. */ }
 }
 

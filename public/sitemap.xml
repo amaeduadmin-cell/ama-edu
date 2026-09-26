@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://amaedu.com.ng/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://amaedu.com.ng/register</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://amaedu.com.ng/find-school</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://amaedu.com.ng/privacy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://amaedu.com.ng/terms</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://amaedu.com.ng/status</loc><changefreq>daily</changefreq><priority>0.3</priority></url>
+</urlset>

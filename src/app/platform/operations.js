@@ -68,16 +68,57 @@ export default async function render({ outlet }) {
     const grace = h("input.input", { type: "number", min: "0", max: "90", value: "7" });
     const note = h("div");
     const save = h("button.btn.btn-primary.btn-sm", { type: "button", text: "Create plan" });
+    const cancel = h("button.btn.btn-outline.btn-sm", { type: "button", text: "Cancel", hidden: true });
+    let editingId = null;
+
+    function setForm(plan = null) {
+      editingId = plan?.id || null;
+      name.value = plan?.name || "";
+      schoolType.value = plan?.school_type || "all";
+      base.value = plan?.base_price ?? 0;
+      perStudent.value = plan?.price_per_student ?? 0;
+      period.value = plan?.billing_period || "termly";
+      grace.value = plan?.grace_days ?? 7;
+      save.textContent = plan ? "Save changes" : "Create plan";
+      cancel.hidden = !plan;
+      note.replaceChildren();
+    }
+
+    function planPayload() {
+      return { name: name.value.trim(), school_type: schoolType.value, base_price: Number(base.value || 0), price_per_student: Number(perStudent.value || 0), billing_period: period.value, grace_days: Number(grace.value || 0), updated_at: new Date().toISOString() };
+    }
+
     save.onclick = async () => {
       if (!name.value.trim()) return mount(note, inlineAlert("Enter a plan name."));
-      setBusy(save, true, "Creating…");
+      setBusy(save, true, editingId ? "Saving…" : "Creating…");
       try {
-        unwrap(await supabase.from("billing_plans").insert({ name: name.value.trim(), school_type: schoolType.value, base_price: Number(base.value || 0), price_per_student: Number(perStudent.value || 0), billing_period: period.value, grace_days: Number(grace.value || 0), is_active: true }), "create billing plan");
-        toastOk("Billing plan created");
+        if (editingId) {
+          unwrap(await supabase.from("billing_plans").update(planPayload()).eq("id", editingId), "update billing plan");
+          toastOk("Billing plan updated");
+        } else {
+          unwrap(await supabase.from("billing_plans").insert({ ...planPayload(), is_active: true }), "create billing plan");
+          toastOk("Billing plan created");
+        }
         window.location.reload();
       } catch (err) { mount(note, inlineAlert(humanError(err))); } finally { setBusy(save, false); }
     };
-    return h("div.card", {}, h("h2.card-title", { text: "Billing plans" }), plans.length ? h("div.table-wrap", {}, h("table.table", {}, h("thead", {}, h("tr", {}, h("th", { text: "Plan" }), h("th", { text: "School type" }), h("th", { text: "Base" }), h("th", { text: "Per student" }), h("th", { text: "Period" }), h("th", { text: "Active" }))), h("tbody", {}, plans.map(plan => h("tr", {}, h("td", { text: plan.name }), h("td", { text: plan.school_type }), h("td", { text: `${plan.currency} ${plan.base_price}` }), h("td", { text: `${plan.currency} ${plan.price_per_student}` }), h("td", { text: plan.billing_period }), h("td", { text: plan.is_active ? "Yes" : "No" })))))) : h("p.u-muted", { text: "No billing plans configured yet. Create the first plan below." }), h("h3.card-title.u-mt-6", { text: "Create a plan" }), h("div.form-grid.cols-2", {}, field({ label: "Plan name", id: "planName", control: name }), field({ label: "School type", id: "planType", control: schoolType }), field({ label: "Base price", id: "planBase", control: base }), field({ label: "Price per student", id: "planStudent", control: perStudent }), field({ label: "Billing period", id: "planPeriod", control: period }), field({ label: "Grace days", id: "planGrace", control: grace })), note, save);
+    cancel.onclick = () => setForm();
+    const rows = plans.map(plan => {
+      const edit = h("button.btn.btn-outline.btn-sm", { type: "button", text: "Edit" });
+      const remove = h("button.btn.btn-danger.btn-sm", { type: "button", text: "Delete" });
+      edit.onclick = () => { setForm(plan); name.focus(); };
+      remove.onclick = async () => {
+        if (!window.confirm(`Delete the billing plan “${plan.name}”? Plans already assigned to subscriptions cannot be deleted.`)) return;
+        setBusy(remove, true, "Deleting…");
+        try {
+          unwrap(await supabase.from("billing_plans").delete().eq("id", plan.id), "delete billing plan");
+          toastOk("Billing plan deleted");
+          window.location.reload();
+        } catch (err) { mount(note, inlineAlert(`This plan could not be deleted. It may be assigned to a school subscription. ${humanError(err)}`)); setBusy(remove, false); }
+      };
+      return h("tr", {}, h("td", { text: plan.name }), h("td", { text: plan.school_type }), h("td", { text: `${plan.currency} ${plan.base_price}` }), h("td", { text: `${plan.currency} ${plan.price_per_student}` }), h("td", { text: plan.billing_period }), h("td", { text: plan.is_active ? "Yes" : "No" }), h("td", {}, h("div.u-row", {}, edit, remove)));
+    });
+    return h("div.card", {}, h("h2.card-title", { text: "Billing plans" }), plans.length ? h("div.table-wrap", {}, h("table.table", {}, h("thead", {}, h("tr", {}, ["Plan", "School type", "Base", "Per student", "Period", "Active", "Actions"].map(label => h("th", { text: label })))), h("tbody", {}, rows))) : h("p.u-muted", { text: "No billing plans configured yet. Create the first plan below." }), h("h3.card-title.u-mt-6", { text: "Create a plan" }), h("div.form-grid.cols-2", {}, field({ label: "Plan name", id: "planName", control: name }), field({ label: "School type", id: "planType", control: schoolType }), field({ label: "Base price", id: "planBase", control: base }), field({ label: "Price per student", id: "planStudent", control: perStudent }), field({ label: "Billing period", id: "planPeriod", control: period }), field({ label: "Grace days", id: "planGrace", control: grace })), note, h("div.u-row", {}, save, cancel));
   }
 
   function billingRecords(subscriptions, invoices) {
